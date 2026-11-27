@@ -17,6 +17,15 @@ Free PDF & file tools that run entirely in your browser. No sign-up, no upload, 
 - **10-second countdown** — after any file is generated, the Download button stays locked for 10 seconds with an ad slot shown beside it. There is no instant-download bypass.
 - **Ads** — three labelled placeholders only (top banner, between tools and workspace, in the download panel). Real AdSense code goes in after a domain is live and AdSense approves the site.
 
+## v1.2 fixes (27 Nov 2026)
+
+- **File-count status** now always reports the TOTAL in the list (`files.length`), not just the last picker batch — e.g. adding a second file in a second session says "2 files added."
+- **Duplicate files** are skipped: a file with the same name, size and last-modified time as one already in the list is not added again, and the status line says plainly "“name.pdf” is already added — skipped." A different file that happens to share a name is still added.
+- **Per-file Compress label** now follows the target size: changing the target (e.g. to 50 KB) re-renders the file cards, so the button reads "Compress to 50 KB". Previews and the merge prompt are not touched by that re-render.
+- **Countdown helper text** now changes when the countdown hits 0: the download panel line reads "Download is unlocked — this wait keeps Dockora free." instead of still saying "Please wait…".
+- **Merge order panel** closes after a successful merge: the merge prompt and order panel are hidden and the merge state is reset, while the download panel and its countdown stay visible.
+- **Merge prompt check confirmed:** `renderMergePrompt()` shows the "more than one file" prompt only when `files.length >= 2` and no merge choice has been made yet — with the new dedupe, a re-added duplicate can no longer inflate that count.
+
 ## v1.1 fixes (27 Nov 2026)
 
 - **Contact:** no support email is shown on the site. The owner's real support address is still needed — the Contact section now says "Support email will be added once the domain is live." and there is no mailto link anywhere.

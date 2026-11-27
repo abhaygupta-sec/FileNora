@@ -78,6 +78,10 @@ function setTargetKb(kb) {
   $('targetLabel').textContent = 'Target: ' + (targetKb >= 1024 ? (targetKb / 1024).toFixed(targetKb % 1024 ? 1 : 0) + ' MB' : targetKb + ' KB');
   document.querySelectorAll('#sizePresets button').forEach((b) =>
     b.classList.toggle('active', Number(b.dataset.kb) === targetKb));
+  /* Keep the per-file "Compress to X KB" buttons honest: re-render the
+     file cards so their labels follow the new target. This only rebuilds
+     the file list — previews and the merge prompt are left alone. */
+  if (files.length) renderFileList();
 }
 document.querySelectorAll('#sizePresets button').forEach((b) =>
   b.addEventListener('click', () => setTargetKb(Number(b.dataset.kb))));
@@ -134,6 +138,7 @@ async function handleFiles(fileList) {
   const list = Array.from(fileList || []);
   if (!list.length) return;
   let added = 0;
+  const skippedDupes = [];
   for (const file of list) {
     const ext = extOf(file.name);
     if (!ACCEPTED_EXT.includes(ext)) {
@@ -142,6 +147,15 @@ async function handleFiles(fileList) {
     }
     if (file.size > MAX_BYTES) {
       setStatus('“' + file.name + '” is over 50 MB and was not added. Please use a smaller file.', true);
+      continue;
+    }
+    /* Skip a file already in the list with the same name, size and
+       last-modified time. A different file that happens to share a name
+       (different size or timestamp) is still added. This also catches
+       the same file picked twice in one batch, since files.push runs
+       inside this loop. */
+    if (files.some((x) => x.name === file.name && x.size === file.size && x.file.lastModified === file.lastModified)) {
+      skippedDupes.push(file.name);
       continue;
     }
     const item = {
@@ -172,10 +186,17 @@ async function handleFiles(fileList) {
     files.push(item);
     added++;
   }
+  /* Status always reports the TOTAL in the list, not just this batch. */
+  const dupeNote = skippedDupes.length
+    ? ' ' + skippedDupes.map((n) => '“' + n + '” is already added — skipped.').join(' ')
+    : '';
   if (added) {
-    setStatus(added + (added === 1 ? ' file' : ' files') + ' added. ' + (files.length >= 2 ? 'Choose Merge or Separate below.' : 'Pick a job and click Run.'));
+    setStatus(files.length + (files.length === 1 ? ' file' : ' files') + ' added. ' + (files.length >= 2 ? 'Choose Merge or Separate below.' : 'Pick a job and click Run.') + dupeNote);
     mergeMode = null; mergeOrder = files.map((f) => f.id);
     renderAll();
+  } else if (skippedDupes.length) {
+    /* Nothing new was added, but the user should still be told why. */
+    setStatus(dupeNote.trim());
   }
 }
 
@@ -458,6 +479,12 @@ async function doMerge() {
   const bytes = await out.save();
   prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'dockora-merged.pdf',
     'Merged ' + ordered.length + ' files into one PDF (' + fmtSize(bytes.length) + ').');
+  /* Close the merge prompt/order panel now the merge is done — it
+     should not linger under the download panel. The download panel
+     and its countdown stay visible. */
+  mergeMode = null;
+  $('mergePrompt').hidden = true;
+  $('mergeOrder').hidden = true;
   setStatus('Merged. Your download unlocks after the 10-second countdown below.');
 }
 
@@ -725,6 +752,14 @@ function startCountdown() {
     $('countdownText').textContent = remaining > 0
       ? 'Download unlocks in ' + remaining + ' second' + (remaining === 1 ? '' : 's') + '…'
       : 'Download is unlocked.';
+    /* The helper line must not keep saying "please wait" after the
+       countdown has finished. It is restored on the next countdown. */
+    const note = $('countdownNote');
+    if (note) {
+      note.textContent = remaining > 0
+        ? 'Please wait — the download button unlocks after the countdown. This keeps Dockora free.'
+        : 'Download is unlocked — this wait keeps Dockora free.';
+    }
     document.querySelectorAll('.download-btn').forEach((b) => { b.disabled = remaining > 0; });
   };
   update();
