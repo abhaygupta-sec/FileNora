@@ -35,6 +35,15 @@ From a live first-time-user test on filenora.in:
 - **Preset guidance.** Under the size presets: "Most forms ask for 100 KB. Photo / passport forms usually ask for 20–50 KB." Custom-size label is now "Or type your own size (KB)".
 - **Privacy Policy section** added (linked from the footer), covering files staying on-device, no data collected, cookies/AdSense disclosure, and contact. Written for AdSense approval; AdSense is not running yet.
 
+## v2.2 typography (27 Nov 2026)
+
+The user reported text sizes looked uneven up and down the page ("upper down small big") — the stylesheet had 15+ scattered one-off sizes (0.7rem, 0.8rem, 0.82rem, 0.85rem, 0.88rem, 0.9rem, 0.92rem, 0.95rem, 1.05rem, 1.15rem, 1.2rem, 1.35rem, 1.7rem, 2.4rem) and mobile only shrank the h1, so on a phone the h2 (27px) was nearly as big as the h1 (30px).
+
+- **One type scale, 7 steps, as CSS variables in `:root`:** display 2.375rem (38px, hero title) / h2 1.5rem (24px, section headings) / h3 1.125rem (18px, panel & guide sub-headings) / lead 1.125rem (18px, hero sub, result line, countdown, drop title) / base 1rem (16px, body, buttons, nav, task titles) / sm 0.875rem (14px, all small & muted text) / xs 0.75rem (12px, ad label only). Every `font-size` in the stylesheet now uses one of these — no one-off values remain (except the deliberate 16px form-input rule on mobile, which stops iOS auto-zoom).
+- **Mobile (≤640px) steps down evenly too:** h1 1.875rem (30px), h2 1.375rem (22px); everything else keeps its scale step, so headings stay clearly bigger than body text at ~360px.
+- **Type-scale pass only:** no wording, layout, colour, or behaviour changed. `app.js` was not touched; the AdSense script in `<head>` is untouched.
+- **Logo (27 Nov 2026, same push):** Logo B picked by Abhay — folder + document + teal down arrow. Header now uses `assets/filenora-logo.png` (40px desktop, 32px mobile); favicon is the cropped folder mark `assets/filenora-icon.png` (512×512). The old "F" text mark and inline-SVG favicon are gone.
+
 ## v2 UX rebuild (27 Nov 2026)
 
 The workspace was rebuilt task-first, because v1 made the user think too hard: three ways to pick a job, files asked for before the task, and technical wording throughout.
