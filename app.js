@@ -18,7 +18,7 @@ let nextId = 1;
 let mergeMode = null;    // null | 'separate' | 'merge'
 let mergeOrder = [];     // array of file ids, in merge order
 let targetKb = 100;
-let pendingOutputs = []; // {blob, filename, note}
+let pendingOutputs = []; // {blob, filename, note, sourceIds: [ids of the files that produced it]}
 let countdownTimer = null;
 let editorFile = null;   // file object being edited
 let editorPage = 1;
@@ -195,8 +195,9 @@ async function handleFiles(fileList) {
     mergeMode = null; mergeOrder = files.map((f) => f.id);
     renderAll();
   } else if (skippedDupes.length) {
-    /* Nothing new was added, but the user should still be told why. */
-    setStatus(dupeNote.trim());
+    /* Nothing new was added, but the status must still show the total
+       count — not just the skip note. */
+    setStatus(files.length + (files.length === 1 ? ' file' : ' files') + ' added. ' + (files.length >= 2 ? 'Choose Merge or Separate below.' : 'Pick a job and click Run.') + dupeNote);
   }
 }
 
@@ -344,6 +345,11 @@ async function fileAction(f, act, card) {
     if (act === 'remove') {
       files = files.filter((x) => x.id !== f.id);
       mergeOrder = mergeOrder.filter((id) => id !== f.id);
+      /* Drop every download that was produced from this file, so its
+         outputs do not linger after the file is gone. Outputs made
+         from other files are kept. */
+      pendingOutputs = pendingOutputs.filter((o) => !(o.sourceIds || []).includes(f.id));
+      renderOutputs();
       if (files.length < 2) mergeMode = null;
       renderAll();
       setStatus('Removed ' + f.name + '.');
@@ -378,16 +384,20 @@ $('btnRunJob').addEventListener('click', async () => {
     if (job === 'merge') {
       if (files.length < 2) { setStatus('Merge needs 2 or more files. Add another file.', true); return; }
       if (mergeMode !== 'merge') { $('mergePrompt').hidden = false; setStatus('Choose “Merge into one PDF” below, set the order, then click Merge.', false); document.getElementById('mergePrompt').scrollIntoView({ behavior: 'smooth' }); return; }
+      /* Fresh run: drop the previous run's outputs first. */
+      clearOutputs();
       await doMerge(); return;
     }
-    if (job === 'jpg2pdf') { await imagesToPdf(files.filter((f) => f.kind === 'image')); return; }
-    if (job === 'pdf2jpg') { const fmt = $('pdf2jpgFormat').value || 'jpg'; for (const f of files.filter((x) => x.kind === 'pdf')) await pdfToImages(f, fmt); return; }
-    if (job === 'pdf2txt') { for (const f of files.filter((x) => x.kind === 'pdf')) await pdfToText(f); return; }
+    if (job === 'jpg2pdf') { const imgs = files.filter((f) => f.kind === 'image'); if (imgs.length) clearOutputs(); await imagesToPdf(imgs); return; }
+    if (job === 'pdf2jpg') { const fmt = $('pdf2jpgFormat').value || 'jpg'; const pdfs = files.filter((x) => x.kind === 'pdf'); if (pdfs.length) clearOutputs(); for (const f of pdfs) await pdfToImages(f, fmt); return; }
+    if (job === 'pdf2txt') { const pdfs = files.filter((x) => x.kind === 'pdf'); if (pdfs.length) clearOutputs(); for (const f of pdfs) await pdfToText(f); return; }
     if (job === 'compress' || job === 'resize') {
+      clearOutputs();
       for (const f of files) await compressFile(f, targetKb);
       return;
     }
     if (job === 'convert') {
+      clearOutputs();
       for (const f of files) {
         const def = f.kind === 'pdf' ? 'jpg' : f.kind === 'image' ? 'pdf' : 'pdf';
         await convertFile(f, def);
@@ -407,6 +417,7 @@ $('btnRunJob').addEventListener('click', async () => {
     if (job === 'rotate') {
       const angle = Number($('rotateAngle').value) || 90;
       const pdfs = files.filter((x) => x.kind === 'pdf');
+      if (pdfs.length) clearOutputs();
       for (const f of pdfs) await rotatePdf(f, angle);
       setStatus('Rotated ' + pdfs.length + ' PDF(s) by ' + angle + '°. Download unlocks after the countdown.');
       return;
@@ -478,7 +489,7 @@ async function doMerge() {
   }
   const bytes = await out.save();
   prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'dockora-merged.pdf',
-    'Merged ' + ordered.length + ' files into one PDF (' + fmtSize(bytes.length) + ').');
+    'Merged ' + ordered.length + ' files into one PDF (' + fmtSize(bytes.length) + ').', ordered.map((f) => f.id));
   /* Close the merge prompt/order panel now the merge is done — it
      should not linger under the download panel. The download panel
      and its countdown stay visible. */
@@ -499,7 +510,7 @@ async function imagesToPdf(images) {
   }
   const bytes = await out.save();
   prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'dockora-images.pdf',
-    'Created a PDF from ' + images.length + ' image(s) (' + fmtSize(bytes.length) + ').');
+    'Created a PDF from ' + images.length + ' image(s) (' + fmtSize(bytes.length) + ').', images.map((f) => f.id));
 }
 
 /* ---------- Convert one file ---------- */
@@ -511,18 +522,18 @@ async function convertFile(f, fmt) {
     await addTextPages(out, f.text || '');
     const bytes = await out.save();
     return prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(f.name) + '.pdf',
-      'Converted ' + f.name + ' to PDF (' + fmtSize(bytes.length) + ').');
+      'Converted ' + f.name + ' to PDF (' + fmtSize(bytes.length) + ').', [f.id]);
   }
   if ((f.kind === 'text' || f.kind === 'docx') && fmt === 'txt') {
     return prepareDownload(new Blob([f.text || ''], { type: 'text/plain' }), baseName(f.name) + '.txt',
-      'Saved the text of ' + f.name + ' as a TXT file.');
+      'Saved the text of ' + f.name + ' as a TXT file.', [f.id]);
   }
   if (f.kind === 'image' && fmt === 'pdf') return imagesToPdf([f]);
   if (f.kind === 'image' && ['jpg', 'png', 'webp'].includes(fmt)) {
     const blob = await imageToFormat(f, fmt, 0.92);
     if (!blob) throw new Error('Could not convert that image.');
     return prepareDownload(blob, baseName(f.name) + '.' + fmt,
-      'Converted ' + f.name + ' to ' + fmt.toUpperCase() + ' (' + fmtSize(blob.size) + ').');
+      'Converted ' + f.name + ' to ' + fmt.toUpperCase() + ' (' + fmtSize(blob.size) + ').', [f.id]);
   }
   setStatus('That conversion is not supported in v1.', true);
 }
@@ -548,7 +559,7 @@ async function pdfToImages(f, fmt) {
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
     const blob = await canvasToBlob(canvas, mime, 0.92);
     prepareDownload(blob, baseName(f.name) + '-page-' + p + '.' + fmt,
-      'Page ' + p + ' of ' + f.name + ' as ' + typeLabel + ' (' + fmtSize(blob.size) + ').');
+      'Page ' + p + ' of ' + f.name + ' as ' + typeLabel + ' (' + fmtSize(blob.size) + ').', [f.id]);
   }
   setStatus('Converted ' + f.pageCount + ' page(s) to ' + typeLabel + '. Downloads unlock after the countdown.');
 }
@@ -562,7 +573,7 @@ async function pdfToText(f) {
   }
   if (!all.trim()) { setStatus('This PDF has no extractable text (it may be a scanned image). Try a PDF with real text.', true); return; }
   prepareDownload(new Blob([all], { type: 'text/plain' }), baseName(f.name) + '.txt',
-    'Extracted text from ' + f.name + ' (' + fmtSize(all.length) + ').');
+    'Extracted text from ' + f.name + ' (' + fmtSize(all.length) + ').', [f.id]);
 }
 
 /* ---------- Compress ---------- */
@@ -584,7 +595,7 @@ async function compressFile(f, kb) {
     const reached = best.size <= targetBytes;
     prepareDownload(best, baseName(f.name) + '-compressed.' + ext,
       'Compressed ' + f.name + ' to ' + fmtSize(best.size) + ' (target ' + kb + ' KB). ' +
-      (reached ? 'Target reached.' : 'Target not reached — this is the smallest we could make it without losing too much quality.'));
+      (reached ? 'Target reached.' : 'Target not reached — this is the smallest we could make it without losing too much quality.'), [f.id]);
     return;
   }
   if (f.kind === 'pdf') {
@@ -613,7 +624,7 @@ async function compressFile(f, kb) {
     const reached = bestSize <= targetBytes;
     prepareDownload(new Blob([bestBytes], { type: 'application/pdf' }), baseName(f.name) + '-compressed.pdf',
       'Compressed ' + f.name + ' to ' + fmtSize(bestSize) + ' (target ' + kb + ' KB). ' +
-      (reached ? 'Target reached.' : 'Target not reached — this is the smallest we could make it while keeping the pages readable. Note: re-rendered PDFs become images, so their text is no longer selectable.'));
+      (reached ? 'Target reached.' : 'Target not reached — this is the smallest we could make it while keeping the pages readable. Note: re-rendered PDFs become images, so their text is no longer selectable.'), [f.id]);
     return;
   }
   if (f.kind === 'text' || f.kind === 'docx') {
@@ -621,7 +632,7 @@ async function compressFile(f, kb) {
     await addTextPages(out, f.text || '');
     const bytes = await out.save();
     prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(f.name) + '.pdf',
-      'Converted ' + f.name + ' to PDF (' + fmtSize(bytes.length) + '). Text files are already small, so there is little to compress.');
+      'Converted ' + f.name + ' to PDF (' + fmtSize(bytes.length) + '). Text files are already small, so there is little to compress.', [f.id]);
     return;
   }
   setStatus('Compress is not supported for that file type in v1.', true);
@@ -654,7 +665,7 @@ async function rotatePdf(f, angle) {
   f.pdfDoc = await pdfjsLib.getDocument({ data: f.arrayBuffer.slice(0) }).promise;
   f.rotation = 0;
   prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(f.name) + '-rotated.pdf',
-    'Rotated ' + f.name + ' by ' + deg + '° (' + fmtSize(bytes.length) + ').');
+    'Rotated ' + f.name + ' by ' + deg + '° (' + fmtSize(bytes.length) + ').', [f.id]);
 }
 
 /* ---------- Split ---------- */
@@ -712,18 +723,35 @@ $('btnDoSplit').addEventListener('click', async () => {
   pages.forEach((p) => out.addPage(p));
   const bytes = await out.save();
   prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(splitFile.name) + '-split.pdf',
-    'Extracted ' + chosen.length + ' page(s) from ' + splitFile.name + ' (' + fmtSize(bytes.length) + ').');
+    'Extracted ' + chosen.length + ' page(s) from ' + splitFile.name + ' (' + fmtSize(bytes.length) + ').', [splitFile.id]);
   $('splitPanel').hidden = true;
 });
 
 /* ---------- Download: 10-second countdown, no bypass ---------- */
-function prepareDownload(blob, filename, note) {
-  pendingOutputs.push({ blob, filename, note });
+/* A fresh run replaces the previous run's outputs instead of letting
+   duplicates pile up: prepareDownload() replaces an output that has
+   the same filename, and clearOutputs() wipes the list at the start
+   of a job run (see the Run handler). Outputs remember which file(s)
+   produced them (sourceIds), so removing a file can drop its outputs. */
+function clearOutputs() {
+  pendingOutputs = [];
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  renderOutputs();
+}
+function prepareDownload(blob, filename, note, sourceIds) {
+  const sources = Array.isArray(sourceIds) ? sourceIds : (sourceIds == null ? [] : [sourceIds]);
+  const entry = { blob, filename, note, sourceIds: sources };
+  /* Replace, don't append: re-running a job must not list the same
+     output twice. */
+  const existing = pendingOutputs.findIndex((o) => o.filename === filename);
+  if (existing >= 0) pendingOutputs[existing] = entry;
+  else pendingOutputs.push(entry);
   renderOutputs();
   startCountdown();
 }
 function renderOutputs() {
   const panel = $('downloadPanel');
+  if (!pendingOutputs.length) { panel.hidden = true; $('outputList').innerHTML = ''; return; }
   panel.hidden = false;
   const list = $('outputList');
   list.innerHTML = '';
@@ -927,7 +955,7 @@ $('btnSaveEdit').addEventListener('click', async () => {
     editorFile.pdfDoc = await pdfjsLib.getDocument({ data: editorFile.arrayBuffer.slice(0) }).promise;
     $('editorModal').hidden = true;
     prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(editorFile.name) + '-edited.pdf',
-      'Saved your edited PDF (' + fmtSize(bytes.length) + '). Font match is best-effort, as shown in the editor.');
+      'Saved your edited PDF (' + fmtSize(bytes.length) + '). Font match is best-effort, as shown in the editor.', [editorFile.id]);
     renderAll();
     setStatus('Edited PDF ready. Download unlocks after the countdown.');
   } catch (err) {

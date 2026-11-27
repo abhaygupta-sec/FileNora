@@ -17,6 +17,13 @@ Free PDF & file tools that run entirely in your browser. No sign-up, no upload, 
 - **10-second countdown** — after any file is generated, the Download button stays locked for 10 seconds with an ad slot shown beside it. There is no instant-download bypass.
 - **Ads** — three labelled placeholders only (top banner, between tools and workspace, in the download panel). Real AdSense code goes in after a domain is live and AdSense approves the site.
 
+## v1.3 fixes (27 Nov 2026)
+
+- **Re-running a job no longer duplicates outputs.** Run selected job clears the previous run's outputs first (for output-producing jobs; Split / Edit only open a panel, so their outputs are cleared when the panel's action produces one), and a per-file action replaces — never appends — an output with the same filename. Running Compress twice now leaves one entry per file, not two.
+- **Removing a file also removes its outputs.** Every output now records which file(s) produced it, and removing a file drops every download that came from that file (including a merged PDF it was part of). Outputs from other files are kept.
+- **Skip-only re-add still shows the file count.** When the same file is re-added and skipped as a duplicate, the status line now reads e.g. "1 file added. Pick a job and click Run. “name.pdf” is already added — skipped." instead of showing only the skip note.
+- **Heading spacing fixed:** "Target size (for Compress / Resize)" — the space now sits inside the muted span text, so it always renders. The same fix was applied to the "Image format" and "Rotate angle" panel headings, which used the same pattern.
+
 ## v1.2 fixes (27 Nov 2026)
 
 - **File-count status** now always reports the TOTAL in the list (`files.length`), not just the last picker batch — e.g. adding a second file in a second session says "2 files added."
