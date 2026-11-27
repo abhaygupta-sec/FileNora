@@ -1,8 +1,12 @@
-# Dockora
+# FileNora
 
 **Every file, one place.**
 
 Free PDF & file tools that run entirely in your browser. No sign-up, no upload, no watermark. Your files never leave your device.
+
+## Rebrand (27 Nov 2026)
+
+Originally built as **Dockora**. Renamed to **FileNora** on 27 Nov 2026 — the Dockora name was already taken, and the domain **filenora.in** was bought the same day. Every reference (branding, output filenames, sitemap, robots.txt) now uses FileNora / filenora.in. Nothing else changed in this rename.
 
 ## What it does (v1)
 
@@ -15,7 +19,7 @@ Free PDF & file tools that run entirely in your browser. No sign-up, no upload, 
 - **Edit PDF** — open a PDF page, drag a white rectangle over a word to cover it (whiteout), or click a spot and add new text with a size and colour you choose. Font matching is best-effort: the page's approximate text size is detected and pre-filled, but the original font is often embedded in the PDF and cannot be matched exactly — the editor says this in plain language.
 - **Rotate PDF** — 90°, 180° or 270° from the Run job, or 90° per click from a file card.
 - **10-second countdown** — after any file is generated, the Download button stays locked for 10 seconds with an ad slot shown beside it. There is no instant-download bypass.
-- **Ads** — three labelled placeholders only (top banner, between tools and workspace, in the download panel). Real AdSense code goes in after a domain is live and AdSense approves the site.
+- **Ads** — three labelled placeholders only (top banner, between tools and workspace, in the download panel). Real AdSense code goes in after AdSense approves the site.
 
 ## v1.3 fixes (27 Nov 2026)
 
@@ -29,7 +33,7 @@ Free PDF & file tools that run entirely in your browser. No sign-up, no upload, 
 - **File-count status** now always reports the TOTAL in the list (`files.length`), not just the last picker batch — e.g. adding a second file in a second session says "2 files added."
 - **Duplicate files** are skipped: a file with the same name, size and last-modified time as one already in the list is not added again, and the status line says plainly "“name.pdf” is already added — skipped." A different file that happens to share a name is still added.
 - **Per-file Compress label** now follows the target size: changing the target (e.g. to 50 KB) re-renders the file cards, so the button reads "Compress to 50 KB". Previews and the merge prompt are not touched by that re-render.
-- **Countdown helper text** now changes when the countdown hits 0: the download panel line reads "Download is unlocked — this wait keeps Dockora free." instead of still saying "Please wait…".
+- **Countdown helper text** now changes when the countdown hits 0: the download panel line reads "Download is unlocked — this wait keeps FileNora free." instead of still saying "Please wait…".
 - **Merge order panel** closes after a successful merge: the merge prompt and order panel are hidden and the merge state is reset, while the download panel and its countdown stay visible.
 - **Merge prompt check confirmed:** `renderMergePrompt()` shows the "more than one file" prompt only when `files.length >= 2` and no merge choice has been made yet — with the new dedupe, a re-added duplicate can no longer inflate that count.
 
@@ -52,7 +56,7 @@ Static site, no build step, no Worker, no server code.
 - `index.html` — page, tools grid, workspace, guides, FAQ, About / Privacy.
 - `styles.css` — navy `#0F2A43` + teal `#0E9F8A`, white background, no gradients.
 - `app.js` — all tool logic.
-- `sitemap.xml`, `robots.txt` — SEO (uses `https://dockora.com/` as the placeholder domain — update when the real domain is chosen).
+- `sitemap.xml`, `robots.txt` — SEO (uses `https://filenora.in/` — the live domain, bought 27 Nov 2026).
 
 CDN libraries (no integrity hashes, as requested):
 
@@ -71,12 +75,12 @@ python3 -m http.server 8000
 
 ## Deploy
 
-This is a plain static site for Cloudflare Pages (Pages project, not a Worker). Push to the `Dockora` repo on GitHub, connect the repo in Cloudflare Pages, and deploy the root folder. No build command is needed.
+This is a plain static site for Cloudflare Pages (Pages project, not a Worker). Push to the `FileNora` repo on GitHub, connect the repo in Cloudflare Pages, and deploy the root folder. No build command is needed.
 
 ## Honest limits (v1)
 
-- **Font matching is best-effort.** PDF fonts are often embedded and cannot be reused by the browser. Dockora detects the approximate size on the page and uses the closest standard font (Helvetica).
-- **Exact KB is not always reachable.** A scanned, photo-heavy PDF may not shrink to 50 KB without becoming unreadable. Dockora iterates down in quality and shows the real final size, saying plainly when the target was missed.
+- **Font matching is best-effort.** PDF fonts are often embedded and cannot be reused by the browser. FileNora detects the approximate size on the page and uses the closest standard font (Helvetica).
+- **Exact KB is not always reachable.** A scanned, photo-heavy PDF may not shrink to 50 KB without becoming unreadable. FileNora iterates down in quality and shows the real final size, saying plainly when the target was missed.
 - **Compressed PDFs become image pages.** Re-rendering a PDF to shrink it means its text is no longer selectable. The download panel says this.
 - **DOCX to PDF keeps text, not layout.** Tables, images and exact Word formatting are not preserved — the extracted text is laid out as plain pages.
 - **PDF to Word is not in v1.** PDF to TXT is implemented; full editable DOCX output is not.

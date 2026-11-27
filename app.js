@@ -1,4 +1,4 @@
-/* Dockora v1 — all processing is client-side, in the browser.
+/* FileNora v1 — all processing is client-side, in the browser.
    Libraries (CDN): PDF.js for rendering / text, pdf-lib for building
    PDFs, Mammoth for DOCX text. No file is ever uploaded. */
 'use strict';
@@ -488,7 +488,7 @@ async function doMerge() {
     }
   }
   const bytes = await out.save();
-  prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'dockora-merged.pdf',
+  prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'filenora-merged.pdf',
     'Merged ' + ordered.length + ' files into one PDF (' + fmtSize(bytes.length) + ').', ordered.map((f) => f.id));
   /* Close the merge prompt/order panel now the merge is done — it
      should not linger under the download panel. The download panel
@@ -509,7 +509,7 @@ async function imagesToPdf(images) {
     page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
   }
   const bytes = await out.save();
-  prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'dockora-images.pdf',
+  prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'filenora-images.pdf',
     'Created a PDF from ' + images.length + ' image(s) (' + fmtSize(bytes.length) + ').', images.map((f) => f.id));
 }
 
@@ -785,8 +785,8 @@ function startCountdown() {
     const note = $('countdownNote');
     if (note) {
       note.textContent = remaining > 0
-        ? 'Please wait — the download button unlocks after the countdown. This keeps Dockora free.'
-        : 'Download is unlocked — this wait keeps Dockora free.';
+        ? 'Please wait — the download button unlocks after the countdown. This keeps FileNora free.'
+        : 'Download is unlocked — this wait keeps FileNora free.';
     }
     document.querySelectorAll('.download-btn').forEach((b) => { b.disabled = remaining > 0; });
   };
