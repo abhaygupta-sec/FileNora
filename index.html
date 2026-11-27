@@ -34,7 +34,7 @@
     <p class="hero-sub">Merge, compress, convert and edit PDFs, photos and documents — free, in your browser. No account, no upload, no watermark.</p>
     <p class="hero-points">Your files never leave your device &middot; Works on phone and computer &middot; No sign-in</p>
     <div class="hero-actions">
-      <a class="btn btn-primary btn-large" href="#workspace">Choose files to start</a>
+      <button type="button" class="btn btn-primary btn-large" id="heroChooseBtn">Choose files to start</button>
       <a class="btn btn-secondary btn-large" href="#tools">See all tools</a>
     </div>
   </section>
@@ -59,7 +59,7 @@
       <button class="tool-card" data-job="pdf2jpg"><span class="tool-title">PDF to JPG</span><span class="tool-desc">Save PDF pages as JPG or PNG images.</span></button>
       <button class="tool-card" data-job="convert"><span class="tool-title">Convert files</span><span class="tool-desc">PDF, JPG, PNG, WebP, TXT and DOCX to PDF — and more.</span></button>
       <button class="tool-card" data-job="edit"><span class="tool-title">Edit PDF</span><span class="tool-desc">Cover a word with whiteout, or add new text on a page.</span></button>
-      <button class="tool-card" data-job="rotate"><span class="tool-title">Rotate PDF</span><span class="tool-desc">Turn PDF pages 90&deg; at a time.</span></button>
+      <button class="tool-card" data-job="rotate"><span class="tool-title">Rotate PDF</span><span class="tool-desc">Turn PDF pages by 90&deg;, 180&deg; or 270&deg;.</span></button>
       <button class="tool-card" data-job="resize"><span class="tool-title">Image resize to exact KB</span><span class="tool-desc">Resize a photo to 20 KB, 50 KB, 100 KB or a size you choose.</span></button>
       <button class="tool-card" data-job="pdf2txt"><span class="tool-title">PDF to TXT</span><span class="tool-desc">Extract the text from a PDF into a plain text file.</span></button>
     </div>
@@ -95,6 +95,28 @@
       <span id="jobHint" class="job-hint">Add 2 or more files, then choose Merge or Separate.</span>
     </div>
 
+    <!-- Job-specific options: shown only for the matching job -->
+    <div id="pdf2jpgPanel" class="panel" hidden>
+      <h3>Image format <span class="muted">(for PDF to JPG / PNG)</span></h3>
+      <label>Save pages as
+        <select id="pdf2jpgFormat">
+          <option value="jpg" selected>JPG</option>
+          <option value="png">PNG</option>
+        </select>
+      </label>
+    </div>
+
+    <div id="rotatePanel" class="panel" hidden>
+      <h3>Rotate angle <span class="muted">(for Rotate PDF)</span></h3>
+      <label>Rotate each page by
+        <select id="rotateAngle">
+          <option value="90" selected>90&deg;</option>
+          <option value="180">180&deg;</option>
+          <option value="270">270&deg;</option>
+        </select>
+      </label>
+    </div>
+
     <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Choose files">
       <p class="drop-title">Drop files here, or click to choose files</p>
       <p class="drop-sub">PDF, JPG, PNG, WebP, DOCX, TXT &middot; Up to 50 MB per file &middot; Multiple files welcome</p>
@@ -122,7 +144,7 @@
     </div>
 
     <!-- Target size -->
-    <div class="panel">
+    <div class="panel" id="targetSizePanel" hidden>
       <h3>Target size <span class="muted">(for Compress / Resize)</span></h3>
       <p class="muted">Pick a size, or type your own. We aim for just under your target and show the real final size. An exact size is not always possible — if we cannot reach it, we will say so plainly.</p>
       <div class="size-presets" id="sizePresets" role="group" aria-label="Target size presets">
@@ -148,7 +170,11 @@
     <!-- Split panel -->
     <div id="splitPanel" class="panel" hidden>
       <h3>Split PDF — pick pages to keep</h3>
-      <p class="muted">Tick the pages you want in the new PDF, then click Extract.</p>
+      <p class="muted">Tick the pages you want in the new PDF, or type a page range below, then click Extract.</p>
+      <div class="row">
+        <label>Page range <input type="text" id="splitRange" placeholder="1-3, 5"></label>
+        <button type="button" class="btn btn-secondary btn-small" id="btnApplySplitRange">Apply range</button>
+      </div>
       <div id="splitPages" class="split-pages"></div>
       <div class="row">
         <button type="button" class="btn btn-primary" id="btnDoSplit">Extract selected pages</button>
@@ -223,7 +249,7 @@
     </article>
     <article class="guide">
       <h3>Merge PDF</h3>
-      <p>Add two or more PDFs, choose “Merge into one PDF”, drag the files into the order you want — first, second, third — then click Merge. You get one PDF, in that order.</p>
+      <p>Add two or more PDFs, choose “Merge files into one PDF” in the “What do you want to do?” list, then click “Run selected job”. When the merge prompt appears, click “Merge into one PDF”, drag the files into the order you want — first, second, third — then click “Merge in this order”. You get one PDF, in that order.</p>
     </article>
     <article class="guide">
       <h3>JPG to PDF</h3>
@@ -231,7 +257,7 @@
     </article>
     <article class="guide">
       <h3>PDF to JPG</h3>
-      <p>Add a PDF, choose “PDF to JPG / PNG”, pick JPG or PNG, and click Run. Each page is saved as an image you can download.</p>
+      <p>Add a PDF, choose “PDF to JPG / PNG”, pick JPG or PNG in the “Image format” box, and click “Run selected job”. Each page is saved as an image you can download.</p>
     </article>
   </section>
 
@@ -253,7 +279,7 @@
     <h3>Privacy</h3>
     <p>Your files are processed locally in your browser. Dockora does not upload, store, or see your files. Closing the tab removes them from memory.</p>
     <h3>Contact</h3>
-    <p>Questions or a problem with a tool? Email: <a href="mailto:hello@dockora.com">hello@dockora.com</a> (replace with your real support address once the domain is live).</p>
+    <p>Support email will be added once the domain is live.</p>
   </section>
 </main>
 
@@ -262,7 +288,7 @@
     <p><strong>Dockora</strong> — Every file, one place.</p>
     <p class="muted small">Free PDF &amp; file tools. No sign-in. Your files never leave your device.</p>
     <nav aria-label="Footer">
-      <a href="#tools">Tools</a> &middot; <a href="#guides">Guides</a> &middot; <a href="#faq">FAQ</a> &middot; <a href="#about">About &amp; Privacy</a> &middot; <a href="mailto:hello@dockora.com">Contact</a>
+      <a href="#tools">Tools</a> &middot; <a href="#guides">Guides</a> &middot; <a href="#faq">FAQ</a> &middot; <a href="#about">About &amp; Privacy</a> &middot; <a href="#about">Contact</a>
     </nav>
     <p class="muted small">&copy; 2026 Dockora. All processing happens in your browser.</p>
   </div>

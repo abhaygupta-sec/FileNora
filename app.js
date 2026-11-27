@@ -88,25 +88,40 @@ const JOB_HINTS = {
   merge: 'Add 2 or more files, then choose Merge or Separate.',
   compress: 'Add a PDF or image, pick a target size above, then Run.',
   convert: 'Add a file, then use the Convert control on its card, or Run.',
-  split: 'Add a PDF, then tick the pages to keep.',
+  split: 'Add a PDF, then tick the pages to keep, or type a page range.',
   edit: 'Add a PDF, then click Edit on its card.',
-  rotate: 'Add a PDF, then click Rotate on its card, or Run.',
+  rotate: 'Add a PDF, pick an angle, then Run — or click Rotate on its card for 90°.',
   jpg2pdf: 'Add JPG, PNG or WebP photos, then Run.',
-  pdf2jpg: 'Add a PDF, choose JPG or PNG, then Run.',
+  pdf2jpg: 'Add a PDF, choose JPG or PNG below, then Run.',
   resize: 'Add an image, pick a target size above, then Run.',
   pdf2txt: 'Add a PDF, then Run to extract its text.'
 };
+/* Show only the option panels that apply to the selected job.
+   Target size is only for Compress / Resize; the format picker only
+   for PDF to JPG / PNG; the angle picker only for Rotate. */
+function updateJobPanels() {
+  const job = $('jobSelect').value;
+  $('targetSizePanel').hidden = !(job === 'compress' || job === 'resize');
+  $('pdf2jpgPanel').hidden = job !== 'pdf2jpg';
+  $('rotatePanel').hidden = job !== 'rotate';
+}
 function setJob(job) {
   $('jobSelect').value = job;
   $('jobHint').textContent = JOB_HINTS[job] || '';
+  updateJobPanels();
   document.getElementById('workspace').scrollIntoView({ behavior: 'smooth' });
 }
-$('jobSelect').addEventListener('change', () => { $('jobHint').textContent = JOB_HINTS[$('jobSelect').value] || ''; });
+$('jobSelect').addEventListener('change', () => { $('jobHint').textContent = JOB_HINTS[$('jobSelect').value] || ''; updateJobPanels(); });
 document.querySelectorAll('#toolsGrid .tool-card').forEach((b) =>
   b.addEventListener('click', () => setJob(b.dataset.job)));
 
 /* ---------- Upload ---------- */
 const dropzone = $('dropzone'), fileInput = $('fileInput');
+/* Hero CTA: scroll to the workspace AND open the file picker. */
+$('heroChooseBtn').addEventListener('click', () => {
+  document.getElementById('workspace').scrollIntoView({ behavior: 'smooth' });
+  fileInput.click();
+});
 $('chooseBtn').addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
 dropzone.addEventListener('click', () => fileInput.click());
 dropzone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
@@ -316,9 +331,8 @@ async function fileAction(f, act, card) {
     if (act === 'edit') { openEditor(f); return; }
     if (act === 'split') { openSplit(f); return; }
     if (act === 'rotate') {
-      f.rotation = (f.rotation + 90) % 360;
-      setStatus(f.name + ' will be rotated ' + f.rotation + '° when you download it. Click “Run selected job” with Rotate, or use Rotate on the card again.');
-      await rotatePdf(f);
+      await rotatePdf(f, 90);
+      setStatus('Rotated ' + f.name + ' by 90°. Click Rotate again to turn it another 90°. Download unlocks after the countdown.');
       return;
     }
     if (act === 'convert') {
@@ -346,7 +360,7 @@ $('btnRunJob').addEventListener('click', async () => {
       await doMerge(); return;
     }
     if (job === 'jpg2pdf') { await imagesToPdf(files.filter((f) => f.kind === 'image')); return; }
-    if (job === 'pdf2jpg') { for (const f of files.filter((x) => x.kind === 'pdf')) await pdfToImages(f, 'jpg'); return; }
+    if (job === 'pdf2jpg') { const fmt = $('pdf2jpgFormat').value || 'jpg'; for (const f of files.filter((x) => x.kind === 'pdf')) await pdfToImages(f, fmt); return; }
     if (job === 'pdf2txt') { for (const f of files.filter((x) => x.kind === 'pdf')) await pdfToText(f); return; }
     if (job === 'compress' || job === 'resize') {
       for (const f of files) await compressFile(f, targetKb);
@@ -370,7 +384,10 @@ $('btnRunJob').addEventListener('click', async () => {
       openEditor(pdf); return;
     }
     if (job === 'rotate') {
-      for (const f of files.filter((x) => x.kind === 'pdf')) await rotatePdf(f);
+      const angle = Number($('rotateAngle').value) || 90;
+      const pdfs = files.filter((x) => x.kind === 'pdf');
+      for (const f of pdfs) await rotatePdf(f, angle);
+      setStatus('Rotated ' + pdfs.length + ' PDF(s) by ' + angle + '°. Download unlocks after the countdown.');
       return;
     }
   } catch (err) {
@@ -597,11 +614,12 @@ async function imageToFormatScaled(f, quality, scale) {
 }
 
 /* ---------- Rotate ---------- */
-async function rotatePdf(f) {
+async function rotatePdf(f, angle) {
+  const deg = [90, 180, 270].includes(Number(angle)) ? Number(angle) : 90;
   const src = await loadPdfLibDoc(f);
   src.getPages().forEach((page) => {
     const cur = page.getRotation().angle;
-    page.setRotation(PDFLib.degrees((cur + 90) % 360));
+    page.setRotation(PDFLib.degrees((cur + deg) % 360));
   });
   const bytes = await src.save();
   // Keep the rotated version as the file's new source, so further edits use it.
@@ -609,7 +627,7 @@ async function rotatePdf(f) {
   f.pdfDoc = await pdfjsLib.getDocument({ data: f.arrayBuffer.slice(0) }).promise;
   f.rotation = 0;
   prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(f.name) + '-rotated.pdf',
-    'Rotated ' + f.name + ' by 90° (' + fmtSize(bytes.length) + ').');
+    'Rotated ' + f.name + ' by ' + deg + '° (' + fmtSize(bytes.length) + ').');
 }
 
 /* ---------- Split ---------- */
@@ -627,6 +645,36 @@ function openSplit(f) {
   $('splitPanel').scrollIntoView({ behavior: 'smooth' });
 }
 $('btnCloseSplit').addEventListener('click', () => { $('splitPanel').hidden = true; });
+/* Split page range: "1-3, 5" ticks pages 1, 2, 3 and 5, unticks the rest. */
+function parseSplitRange(text, pageCount) {
+  const pages = new Set();
+  const parts = String(text || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return { error: 'Enter a page range, for example "1-3, 5".' };
+  for (const part of parts) {
+    const range = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (range) {
+      const a = Number(range[1]), b = Number(range[2]);
+      if (a < 1 || b > pageCount || a > b) return { error: 'Page range "' + part + '" is out of range. This PDF has ' + pageCount + ' page(s).' };
+      for (let p = a; p <= b; p++) pages.add(p);
+    } else if (/^\d+$/.test(part)) {
+      const p = Number(part);
+      if (p < 1 || p > pageCount) return { error: 'Page ' + p + ' does not exist. This PDF has ' + pageCount + ' page(s).' };
+      pages.add(p);
+    } else {
+      return { error: '"' + part + '" is not a valid page or range. Use numbers like "1-3, 5".' };
+    }
+  }
+  return { pages: Array.from(pages).sort((a, b) => a - b) };
+}
+$('btnApplySplitRange').addEventListener('click', () => {
+  if (!splitFile) return;
+  const result = parseSplitRange($('splitRange').value, splitFile.pageCount);
+  if (result.error) { setStatus(result.error, true); return; }
+  document.querySelectorAll('#splitPages input[type="checkbox"]').forEach((c) => {
+    c.checked = result.pages.includes(Number(c.value));
+  });
+  setStatus('Selected page(s): ' + result.pages.join(', ') + '. Click “Extract selected pages” when ready.');
+});
 $('btnDoSplit').addEventListener('click', async () => {
   if (!splitFile) return;
   const chosen = Array.from(document.querySelectorAll('#splitPages input:checked')).map((c) => Number(c.value) - 1);
@@ -854,4 +902,5 @@ $('btnSaveEdit').addEventListener('click', async () => {
 
 /* ---------- Init ---------- */
 setTargetKb(100);
+updateJobPanels(); /* default job is Merge, so the Target size panel starts hidden */
 setStatus('Ready. Add a file to begin — no sign-in, and your files never leave your device.');
