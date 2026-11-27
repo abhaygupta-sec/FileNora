@@ -360,15 +360,15 @@ function renderFileList() {
       : f.kind === 'docx' || f.kind === 'text' ? 'Text document'
       : 'Image';
     /* A file card shows what the file is — name, kind, size — plus
-       Edit (images and PDFs only) and Remove. Every job still runs
-       from the one big button in Step 3; Edit is the step before a
-       job, not a job itself. DOCX / TXT get no Edit button: pixel and
-       PDF editing does not apply to them. */
+       Edit and Remove. Every job still runs from the one big button
+       in Step 3; Edit is the step before a job, not a job itself.
+       Every file kind has an Edit: images get the image editor, PDFs
+       the PDF editor, DOCX and TXT the text editor. */
     card.innerHTML =
       '<h4>' + esc(f.name) + '</h4>' +
       '<p class="file-meta">' + esc(meta) + ' &middot; ' + esc(f.ext.toUpperCase()) + ' &middot; ' + fmtSize(f.size) + '</p>' +
       '<div class="file-actions">' +
-        ((f.kind === 'image' || f.kind === 'pdf') ? '<button type="button" class="btn btn-secondary btn-small" data-act="edit">Edit</button>' : '') +
+        '<button type="button" class="btn btn-secondary btn-small" data-act="edit">Edit</button>' +
         '<button type="button" class="btn btn-secondary btn-small" data-act="remove">Remove</button>' +
       '</div>';
     card.querySelectorAll('[data-act="remove"]').forEach((btn) => {
@@ -623,12 +623,43 @@ async function embedImage(pdfDoc, f) {
   return await pdfDoc.embedJpg(await blob.arrayBuffer());
 }
 
+/* ---------- N-up: several pages on one sheet ---------- */
+/* Lay several source pages onto each output sheet (2 or 4 per sheet;
+   1 = normal and never reaches this helper). Each item is an
+   already-embedded page ({embeddedPage, width, height}) or an embedded
+   image ({img, width, height}). Sheets are A4 portrait with a margin;
+   each source keeps its proportions and is centred in its cell. */
+function addNupPages(out, items, perSheet) {
+  const SHEET_W = 595, SHEET_H = 842, MARGIN = 24;
+  const cols = perSheet === 4 ? 2 : 1;
+  const rows = 2;
+  const cellW = (SHEET_W - MARGIN * (cols + 1)) / cols;
+  const cellH = (SHEET_H - MARGIN * (rows + 1)) / rows;
+  for (let i = 0; i < items.length; i += perSheet) {
+    const page = out.addPage([SHEET_W, SHEET_H]);
+    const group = items.slice(i, i + perSheet);
+    group.forEach((item, k) => {
+      const col = k % cols, row = Math.floor(k / cols);
+      const cellX = MARGIN + col * (cellW + MARGIN);
+      const cellTop = SHEET_H - MARGIN - row * (cellH + MARGIN);
+      const scale = Math.min(cellW / item.width, cellH / item.height);
+      const w = item.width * scale, h = item.height * scale;
+      const x = cellX + (cellW - w) / 2;
+      const y = cellTop - cellH + (cellH - h) / 2;
+      if (item.embeddedPage) page.drawPage(item.embeddedPage, { x, y, width: w, height: h });
+      else page.drawImage(item.img, { x, y, width: w, height: h });
+    });
+  }
+}
+
 /* ---------- Merge ---------- */
 async function doMerge() {
   if (!PDFLib) throw new Error('PDF library did not load. Check your connection and reload.');
   const ordered = joinOrder.map((id) => files.find((x) => x.id === id)).filter(Boolean);
   if (ordered.length < 2) { setStatus('Joining needs 2 or more files.', true); return; }
   setStatus('Joining ' + ordered.length + ' files…');
+  const perSheet = Number($('joinNup').value) || 1;
+  if (perSheet !== 1) { await doMergeNup(ordered, perSheet); return; }
   const out = await PDFLib.PDFDocument.create();
   for (const f of ordered) {
     if (f.kind === 'pdf') {
@@ -647,6 +678,43 @@ async function doMerge() {
   prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'filenora-merged.pdf',
     'Joined ' + ordered.length + ' files into one PDF (' + fmtSize(bytes.length) + ').', ordered.map((f) => f.id));
   setResult('Done — 1 PDF made from ' + ordered.length + ' files (' + fmtSize(bytes.length) + ').');
+  setStatus('Done. Your download unlocks after the 10-second countdown below.');
+}
+
+/* Join with 2 or 4 pages on each sheet: every source page (PDF pages,
+   photos, and text pages) is embedded, then laid out in a grid — the
+   same N-up layout as the PDF editor's save. */
+async function doMergeNup(ordered, perSheet) {
+  const out = await PDFLib.PDFDocument.create();
+  const items = [];
+  for (const f of ordered) {
+    if (f.kind === 'pdf') {
+      const src = await loadPdfLibDoc(f);
+      for (let i = 0; i < src.getPageCount(); i++) {
+        const page = src.getPage(i);
+        const embedded = await out.embedPage(page);
+        items.push({ embeddedPage: embedded, width: page.getWidth(), height: page.getHeight() });
+      }
+    } else if (f.kind === 'image') {
+      const img = await embedImage(out, f);
+      items.push({ img, width: img.width, height: img.height });
+    } else {
+      /* Text files: lay the text out on plain pages first, then embed
+         those pages like any other. */
+      const tmp = await PDFLib.PDFDocument.create();
+      await addTextPages(tmp, f.text || '');
+      for (let i = 0; i < tmp.getPageCount(); i++) {
+        const page = tmp.getPage(i);
+        const embedded = await out.embedPage(page);
+        items.push({ embeddedPage: embedded, width: page.getWidth(), height: page.getHeight() });
+      }
+    }
+  }
+  addNupPages(out, items, perSheet);
+  const bytes = await out.save();
+  prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'filenora-merged.pdf',
+    'Joined ' + ordered.length + ' files into one PDF with ' + perSheet + ' pages on each sheet (' + fmtSize(bytes.length) + ').', ordered.map((f) => f.id));
+  setResult('Done — 1 PDF made from ' + ordered.length + ' files, ' + perSheet + ' pages on each sheet (' + fmtSize(bytes.length) + ').');
   setStatus('Done. Your download unlocks after the 10-second countdown below.');
 }
 
@@ -1061,8 +1129,28 @@ function openEditor(f) {
   }
   $('editorModal').hidden = false;
   renderEditorPage();
+  updateEditorPageNav();
 }
-$('editorPageSelect').addEventListener('change', () => { editorPage = Number($('editorPageSelect').value); renderEditorPage(); });
+$('editorPageSelect').addEventListener('change', () => { editorPage = Number($('editorPageSelect').value); pendingTextPos = null; renderEditorPage(); updateEditorPageNav(); });
+/* Page navigation inside the PDF editor: Prev / Next move through the
+   pages without closing the modal. Edits are stored per page, so moving
+   away and back never loses what was done on another page. */
+function updateEditorPageNav() {
+  if (!editorFile) return;
+  $('editorPageLabel').textContent = 'Page ' + editorPage + ' of ' + editorFile.pageCount;
+  $('btnEditorPrev').disabled = editorPage <= 1;
+  $('btnEditorNext').disabled = editorPage >= editorFile.pageCount;
+}
+function editorGoToPage(p) {
+  if (!editorFile) return;
+  editorPage = Math.max(1, Math.min(editorFile.pageCount, p));
+  pendingTextPos = null; // a click position belongs to the old page
+  $('editorPageSelect').value = String(editorPage);
+  renderEditorPage();
+  updateEditorPageNav();
+}
+$('btnEditorPrev').addEventListener('click', () => editorGoToPage(editorPage - 1));
+$('btnEditorNext').addEventListener('click', () => editorGoToPage(editorPage + 1));
 $('btnCloseEditor').addEventListener('click', () => { $('editorModal').hidden = true; renderPreviews(); });
 $('modeWhiteout').addEventListener('click', () => { editMode = 'whiteout'; $('modeWhiteout').className = 'btn btn-primary btn-small'; $('modeText').className = 'btn btn-secondary btn-small'; });
 $('modeText').addEventListener('click', () => { editMode = 'text'; $('modeText').className = 'btn btn-primary btn-small'; $('modeWhiteout').className = 'btn btn-secondary btn-small'; });
@@ -1198,13 +1286,33 @@ $('btnSaveEdit').addEventListener('click', async () => {
         });
       });
     });
-    const bytes = await src.save();
+    const bytes = await (async () => {
+      const perSheet = Number($('editorNup').value) || 1;
+      if (perSheet === 1) return await src.save();
+      /* N-up: lay 2 or 4 edited pages onto each new sheet. */
+      const out = await PDFLib.PDFDocument.create();
+      const items = [];
+      for (const p of src.getPages()) {
+        const embedded = await out.embedPage(p);
+        items.push({ embeddedPage: embedded, width: p.getWidth(), height: p.getHeight() });
+      }
+      addNupPages(out, items, perSheet);
+      return await out.save();
+    })();
     editorFile.arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     editorFile.pdfDoc = await pdfjsLib.getDocument({ data: editorFile.arrayBuffer.slice(0) }).promise;
+    editorFile.pageCount = editorFile.pdfDoc.numPages;
+    /* The edits are now baked into the saved file — clear them so they
+       are not applied a second time if the file is edited again. With
+       N-up the page count also changed, so old per-page edits would
+       point at the wrong pages. */
+    editorFile.edits = {};
+    editorPage = 1;
+    const perSheet = Number($('editorNup').value) || 1;
     $('editorModal').hidden = true;
     prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(editorFile.name) + '-edited.pdf',
-      'Saved your edited PDF (' + fmtSize(bytes.length) + '). Font match is best-effort, as shown in the editor.', [editorFile.id]);
-    setResult('Done — your edited PDF is ready (' + fmtSize(bytes.length) + ').');
+      'Saved your edited PDF (' + fmtSize(bytes.length) + '). Font match is best-effort, as shown in the editor.' + (perSheet > 1 ? ' ' + perSheet + ' pages on each sheet.' : ''), [editorFile.id]);
+    setResult('Done — your edited PDF is ready' + (perSheet > 1 ? ' with ' + perSheet + ' pages on each sheet' : '') + ' (' + fmtSize(bytes.length) + ').');
     renderAll();
     setStatus('Edited PDF ready. Download unlocks after the countdown.');
   } catch (err) {
@@ -1220,19 +1328,84 @@ $('btnSaveEdit').addEventListener('click', async () => {
    at render time. Text positions are fractions of the canvas, so they
    survive rotate, flip, crop and resize. "Done" exports the canvas back
    into the same file slot (same id, name and list position); "Cancel"
-   throws the edits away. DOCX / TXT have no editor: pixel and PDF
-   editing does not apply to them. */
+   throws the edits away. DOCX / TXT use the text editor instead. */
 let imgEd = null;        // working state for the image being edited
 let imgEdCropDrag = null; // {fx, fy} while dragging a crop box
 
-/* One Edit button, two editors: PDFs open the existing PDF editor
-   (whiteout + add text), images open the image editor below. */
+/* One Edit button, three editors: PDFs open the existing PDF editor
+   (whiteout + add text), images open the image editor below, and
+   DOCX / TXT open the text editor. */
 function openFileEditor(f) {
   if (f.kind === 'pdf') { openEditor(f); return; }
   if (f.kind === 'image') { openImageEditor(f); return; }
-  /* DOCX / TXT: no Edit button is shown for these, so this is only a
-     safety net — nothing to open. */
+  if (f.kind === 'docx' || f.kind === 'text') { openTextEditor(f); return; }
 }
+
+/* ---------- Edit text: DOCX and TXT ---------- */
+/* The text editor shows the document's text in a plain textarea.
+   For a Word file only the text is kept — bold, tables, pictures and
+   other formatting are not saved, and the note above the editor says
+   so. "Done" builds a new .docx from the edited text (one paragraph
+   per blank-line gap) or replaces the .txt content. The file is
+   replaced in place: same id, name and position — the same pattern as
+   the image editor's Done. */
+let textEdFile = null;
+function openTextEditor(f) {
+  textEdFile = f;
+  $('textEditorTitle').textContent = 'Edit text — ' + f.name;
+  $('textEditorArea').value = f.text || '';
+  $('textEditorError').hidden = true;
+  $('textEditorError').textContent = '';
+  $('textEditorNote').textContent = f.kind === 'docx'
+    ? 'This is the text from your Word file. Only the text is kept — bold, tables, pictures and other formatting are not saved. When you tap Done, a new Word file is made from this text, with one paragraph per blank-line gap.'
+    : 'Edit the text below, then tap Done to keep your changes.';
+  $('textEditorModal').hidden = false;
+  $('textEditorArea').focus();
+}
+function textEdClose() { $('textEditorModal').hidden = true; textEdFile = null; }
+function textEdShowError(msg) {
+  const el = $('textEditorError');
+  el.textContent = msg;
+  el.hidden = false;
+}
+async function textEdDone() {
+  if (!textEdFile) return;
+  const f = textEdFile;
+  const newText = $('textEditorArea').value;
+  try {
+    if (f.kind === 'docx') {
+      if (!window.docx || !window.docx.Document || !window.docx.Packer) {
+        textEdShowError('The Word library did not load. Check your connection and reload the page, then try again.');
+        return;
+      }
+      const paras = String(newText).split(/\r?\n\s*\r?\n/).map((p) => p.replace(/\s*\r?\n\s*/g, ' ').trim()).filter((p) => p.length);
+      if (!paras.length) paras.push('');
+      const doc = new window.docx.Document({
+        sections: [{ children: paras.map((p) => new window.docx.Paragraph({ children: [new window.docx.TextRun(p)] })) }]
+      });
+      const blob = await window.docx.Packer.toBlob(doc);
+      if (!blob) throw new Error('Could not build the Word file.');
+      const newFile = new File([blob], f.name, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', lastModified: Date.now() });
+      f.file = newFile; f.size = blob.size; f.text = newText;
+    } else {
+      const blob = new Blob([newText], { type: 'text/plain' });
+      const newFile = new File([blob], f.name, { type: 'text/plain', lastModified: Date.now() });
+      f.file = newFile; f.size = blob.size; f.text = newText;
+    }
+    /* Drop any downloads made from the old version of this file, so
+       stale outputs never linger after an edit. */
+    pendingOutputs = pendingOutputs.filter((o) => !(o.sourceIds || []).includes(f.id));
+    renderOutputs();
+    textEdClose();
+    renderAll();
+    setStatus('Saved your edits to ' + f.name + ' — it is now ' + fmtSize(f.size) + '.');
+  } catch (err) {
+    textEdShowError('Could not save the edited file: ' + (err && err.message ? err.message : 'unknown error'));
+  }
+}
+$('btnTextDone').addEventListener('click', textEdDone);
+$('btnTextCancel').addEventListener('click', textEdClose);
+$('btnCloseTextEditor').addEventListener('click', textEdClose);
 
 async function openImageEditor(f) {
   const img = new Image();

@@ -151,6 +151,14 @@
       <h3>Put your files in order</h3>
       <p class="muted">The 1st file becomes the first pages of your PDF. Use the Up / Down buttons to change the order.</p>
       <ol id="joinOrderList" class="order-list"></ol>
+      <label class="nup-label">Pages on each sheet
+        <select id="joinNup">
+          <option value="1" selected>1 (normal)</option>
+          <option value="2">2</option>
+          <option value="4">4</option>
+        </select>
+      </label>
+      <p class="muted small">With 2 or 4, several pages are shrunk onto each sheet of the merged PDF.</p>
     </div>
 
     <div id="splitPanel" class="panel" hidden>
@@ -203,6 +211,11 @@
         <h3 id="editorTitle">Remove a word</h3>
         <button type="button" class="btn btn-secondary" id="btnCloseEditor">Close</button>
       </div>
+      <div class="row editor-page-nav">
+        <button type="button" class="btn btn-secondary btn-small" id="btnEditorPrev">&larr; Prev</button>
+        <span class="page-nav-label" id="editorPageLabel">Page 1 of 1</span>
+        <button type="button" class="btn btn-secondary btn-small" id="btnEditorNext">Next &rarr;</button>
+      </div>
       <p class="muted">Cover a word: drag a box over it. Add new text: click a spot on the page, type your text, then tap &ldquo;Place text&rdquo;. The new text will look close to the original — an exact font match isn&rsquo;t always possible.</p>
       <div class="editor-controls">
         <label>Page
@@ -225,7 +238,31 @@
       </div>
       <div class="row">
         <button type="button" class="btn btn-primary" id="btnSaveEdit">Save edited PDF</button>
-        <span class="muted small">Saving creates a new PDF with your changes applied.</span>
+        <label class="nup-label">Pages on each sheet
+          <select id="editorNup">
+            <option value="1" selected>1 (normal)</option>
+            <option value="2">2</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <span class="muted small">Saving creates a new PDF with your changes applied. With 2 or 4, several pages are shrunk onto each sheet.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text editor modal (DOCX and TXT) -->
+  <div id="textEditorModal" class="modal" hidden role="dialog" aria-modal="true" aria-label="Edit text">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="textEditorTitle">Edit text</h3>
+        <button type="button" class="btn btn-secondary" id="btnCloseTextEditor">Close</button>
+      </div>
+      <p class="muted" id="textEditorNote">Edit the text below, then tap Done to keep your changes.</p>
+      <textarea id="textEditorArea" class="text-editor-area" rows="16"></textarea>
+      <p id="textEditorError" class="status error" hidden></p>
+      <div class="row">
+        <button type="button" class="btn btn-secondary" id="btnTextCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnTextDone">Done — use this text</button>
       </div>
     </div>
   </div>
@@ -362,6 +399,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

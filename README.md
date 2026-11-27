@@ -22,9 +22,19 @@ Originally built as **Dockora**. Renamed to **FileNora** on 27 Nov 2026 — the 
 - **10-second countdown** — after any file is generated, a visible progress bar counts down 10 seconds and the Download button unlocks. There is no instant-download bypass.
 - **Ads** — three labelled placeholders only (top banner, between tasks and workspace, in the download panel). AdSense verification code placed in `<head>` on 27 Nov 2026 (pub-2188368806087422, `ads.txt` added); site under review. No ad units yet — those come after approval.
 
+## v2.4 edit for all files (27 Nov 2026)
+
+The user asked for Edit on every file type, page navigation inside the PDF editor, and putting several pages on one sheet.
+
+- **Edit for DOCX and TXT too.** Every file row now has an Edit button — images, PDFs, DOCX and TXT. DOCX and TXT open a text editor with the document's text in a plain textarea. For a Word file only the text is kept: the editor says plainly that bold, tables, pictures and other formatting are not saved. Done builds a new .docx from the edited text (one paragraph per blank-line gap, via the `docx` library loaded from CDN; if that library fails to load, the editor shows a plain error instead of silently breaking). For TXT, Done replaces the file's text. Like the image editor, Done replaces the file in place — same id, name and position — and drops downloads made from the old version.
+- **Page navigation in the PDF editor.** The PDF editor (whiteout + add text) used to show one page with only a dropdown to jump. It now has Prev / Next buttons and a plain "Page 2 of 5" label in the modal header. Edits are stored per page, so moving to another page and back never loses what was done. The dropdown still works as a jump.
+- **Several pages on one sheet (N-up).** A "Pages on each sheet" selector (1 normal / 2 / 4) sits next to "Save edited PDF" in the PDF editor and in the Join panel. With 2 or 4, the saved or merged PDF shrinks several source pages onto each A4 sheet (2 = one column of two, 4 = two-by-two), each page keeping its proportions and centred in its cell. It works for PDF pages and photos in a join, and for text pages too. With 1 selected, saving and joining behave exactly as before.
+- **PDF preview was already there** — every PDF page renders as a thumbnail in Step 2, and the editor shows the page on canvas. Nothing changed there.
+- **Scope limits (deliberate):** no Word formatting preservation (bold, tables, images in DOCX are not kept — text only, and the editor says so); no PDF text reflow; no per-page different N-up mixes (one choice applies to the whole save or join).
+
 ## v2.3 editor (27 Nov 2026)
 
-The user asked for Photopea-style editing before converting: uploading a JPG and tapping Convert used to convert straight away, with no chance to crop or fix the file first. Every file row now has an **Edit** button (images and PDFs; DOCX / TXT have none — pixel and PDF editing does not apply to them). Convert itself stays direct — Edit is the step before it, and the Convert panel now says: "Want to crop or fix it first? Tap Edit on the file below."
+The user asked for Photopea-style editing before converting: uploading a JPG and tapping Convert used to convert straight away, with no chance to crop or fix the file first. Every file row now has an **Edit** button (images and PDFs at the time — DOCX / TXT got their own text editor in v2.4). Convert itself stays direct — Edit is the step before it, and the Convert panel now says: "Want to crop or fix it first? Tap Edit on the file below."
 
 - **Edit image (JPG / PNG / WebP)** — a canvas editor in a modal: Crop (drag a box, Apply / Cancel), Rotate left / right in 90° steps, Flip horizontal / vertical, Resize by pixels with a "Keep proportions" lock, Adjust sliders for Brightness / Contrast / Saturation (live preview), Filters (None, Grayscale, Sepia, Invert), Text (click a spot, type, pick size and colour, Place text — same simple approach as the PDF editor). Undo steps back through edits (20 steps), Reset goes back to the original file.
 - **Edit PDF** — the Edit button opens the existing PDF editor (whiteout + add text); that logic was not rebuilt. The sample file is a PDF, so its Edit opens the PDF editor too.
@@ -107,6 +117,7 @@ CDN libraries (no integrity hashes, as requested):
 - PDF.js 3.11.174 (cdnjs) — PDF rendering and text extraction.
 - pdf-lib 1.17.1 (jsdelivr) — building / merging / editing PDFs.
 - Mammoth.js 1.6.0 (cdnjs) — DOCX text extraction.
+- docx 8.5.0 (jsdelivr, UMD) — building .docx files from edited text (v2.4). Verified loading: HTTP 200, exposes `window.docx` with Document, Paragraph, TextRun and Packer.
 
 ## Run locally
 

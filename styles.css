@@ -156,6 +156,15 @@ img, canvas { max-width: 100%; }
 .editor-canvas-wrap canvas { display: block; }
 #editorOverlay { position: absolute; left: 0; top: 0; cursor: crosshair; }
 
+/* PDF editor: page navigation + pages-per-sheet */
+.editor-page-nav { margin: 12px 0 0; }
+.page-nav-label { font-size: var(--fs-base); font-weight: 700; color: var(--navy); min-width: 96px; text-align: center; }
+.nup-label { display: inline-flex; gap: 8px; align-items: center; font-size: var(--fs-base); font-weight: 600; }
+.nup-label select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: #fff; }
+
+/* Text editor (DOCX / TXT) */
+.text-editor-area { width: 100%; min-height: 320px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: var(--fs-base); line-height: 1.55; background: #fff; resize: vertical; }
+
 /* Image editor */
 .img-toolbar { display: grid; gap: 10px; margin: 12px 0; }
 .img-tool-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
