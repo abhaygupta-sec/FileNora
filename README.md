@@ -11,7 +11,7 @@ Originally built as **Dockora**. Renamed to **FileNora** on 27 Nov 2026 — the 
 ## What it does (v2)
 
 - **Pick a task first** — 8 plain-language tasks in Step 1. Step 2 adds the files, Step 3 is one big button named for the task.
-- **Upload** — drag-and-drop or file picker. PDF, JPG, PNG, WebP, DOCX, TXT. Multiple files at once, up to 50 MB per file. A "Try with a sample file" button builds a small sample PDF for testing.
+- **Upload** — drag-and-drop or file picker. PDF, JPG, PNG, WebP, DOCX, TXT. Multiple files at once, up to 50 MB per file. A "Try with a sample file" button builds a sample PDF big enough to shrink, for testing.
 - **Preview** — every PDF page (via PDF.js), images directly, TXT and DOCX as extracted text.
 - **Join files into one PDF** — pick the task, add 2 or more files, put them in order with Up / Down buttons, tap "Join into one PDF".
 - **Keep only some pages** — tick the pages to keep, or type a page range like "1-3, 5", then tap "Keep these pages".
@@ -20,7 +20,20 @@ Originally built as **Dockora**. Renamed to **FileNora** on 27 Nov 2026 — the 
 - **Edit PDF** — open a PDF page, drag a white rectangle over a word to cover it (whiteout), or click a spot and add new text with a size and colour you choose. Font matching is best-effort: the page's approximate text size is detected and pre-filled, but the original font is often embedded in the PDF and cannot be matched exactly — the editor says this in plain language.
 - **Rotate PDF** — pick the angle (90°, 180° or 270°), tap "Turn the pages".
 - **10-second countdown** — after any file is generated, a visible progress bar counts down 10 seconds and the Download button unlocks. There is no instant-download bypass.
-- **Ads** — three labelled placeholders only (top banner, between tasks and workspace, in the download panel). Real AdSense code goes in after AdSense approves the site.
+- **Ads** — three labelled placeholders only (top banner, between tasks and workspace, in the download panel). AdSense verification code placed in `<head>` on 27 Nov 2026 (pub-2188368806087422, `ads.txt` added); site under review. No ad units yet — those come after approval.
+
+## v2.1 fixes (27 Nov 2026)
+
+From a live first-time-user test on filenora.in:
+
+- **Compress no longer makes a file bigger.** If the file is already at or under the target, it is not re-encoded — the original file is offered back with "Already smaller than 100 KB — your file is 1.1 KB, so there is nothing to shrink." If the compressed version ends up larger than the original, the original is offered instead with "We couldn't make it smaller…". The result line always shows both sizes ("Done — your file is 87 KB (was 312 KB), under your 100 KB limit.") and never claims "Target reached" when the file grew.
+- **Status line and button hint follow state.** After picking a task: "You picked: Make a file smaller. Now add your files below." After files are added: "2 files added. Tap 'Make it smaller' when you're ready." The button hint moves from "Pick a task above to continue." to "Add your files above, then tap the button." to "Ready — tap the button."
+- **Working state paints before the job starts.** The action button shows the spinner + "Working…" synchronously on click, then the job runs after a `setTimeout(0)` yield so the browser can paint it. The Split button got the same treatment.
+- **The 10-second wait is warned about before the run.** A static line under the Step 3 button (and under the Split button) says the download unlocks in 10 seconds and why.
+- **Bigger sample file.** The sample is now a photo-like JPEG (gradient + noise, ~300 KB) embedded on 2 pages of a PDF, so "Make a file smaller" can actually show shrinking. Each click makes a distinct file (`filenora-sample-1.pdf`, `-2.pdf`, …) with its own caption and timestamp, so the duplicate skip never blocks a second click and two samples can demo Join.
+- **Ad placeholders look intentional.** The scaffolding text is gone — each slot is now just a clearly-labelled empty "Advertisement" box with a dashed border. The AdSense verification script was added to `<head>` on 27 Nov 2026 (separate step); the slots stay empty until ad units are created after approval.
+- **Preset guidance.** Under the size presets: "Most forms ask for 100 KB. Photo / passport forms usually ask for 20–50 KB." Custom-size label is now "Or type your own size (KB)".
+- **Privacy Policy section** added (linked from the footer), covering files staying on-device, no data collected, cookies/AdSense disclosure, and contact. Written for AdSense approval; AdSense is not running yet.
 
 ## v2 UX rebuild (27 Nov 2026)
 

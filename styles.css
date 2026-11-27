@@ -55,10 +55,9 @@ img, canvas { max-width: 100%; }
 .btn-large { padding: 13px 24px; font-size: 1.05rem; }
 .btn-small { padding: 7px 12px; font-size: 0.9rem; }
 
-/* Ads — clearly labelled placeholders only */
-.ad-slot { border: 1px dashed #b9c6d2; background: var(--bg-soft); border-radius: var(--radius); padding: 14px 16px; text-align: center; margin: 18px 0; }
+/* Ads — clearly labelled, intentionally empty slots (real ads come later) */
+.ad-slot { border: 1px dashed #b9c6d2; background: var(--bg-soft); border-radius: var(--radius); padding: 14px 16px; margin: 18px 0; min-height: 64px; display: flex; align-items: center; justify-content: center; }
 .ad-label { display: block; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.ad-text { color: var(--muted); font-size: 0.9rem; }
 .ad-inline { margin: 12px 0; }
 
 /* Sections / task cards */

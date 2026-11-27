@@ -20,6 +20,8 @@ let currentTask = null;  // 'compress' | 'join' | 'jpg2pdf' | 'pdf2jpg' | 'split
 let joinOrder = [];      // array of file ids, in join order (Join task)
 let resultText = '';     // plain-language result line shown above the downloads
 let targetKb = 100;
+let compressResults = []; // per-file compress outcomes {kind, text}, for the plain result line
+let sampleCount = 0;      // sample files are numbered so each click makes a distinct file
 let pendingOutputs = []; // {blob, filename, note, sourceIds: [ids of the files that produced it]}
 let countdownTimer = null;
 let editorFile = null;   // file object being edited
@@ -35,10 +37,32 @@ function setStatus(msg, isError) {
   el.textContent = msg || '';
   el.classList.toggle('error', !!isError);
 }
+/* The status line under Step 2 follows what the user has done so far —
+   it never says "pick a task" after a task was picked. `extra` is an
+   optional note appended (e.g. a duplicate-skip note). */
+const INIT_STATUS = 'Ready. Pick what you want to do above, then add your files — no sign-in, and your files never leave your device.';
+function updateStatusLine(extra) {
+  let msg;
+  if (!currentTask) msg = INIT_STATUS;
+  else if (!files.length) msg = 'You picked: ' + TASKS[currentTask].title + '. Now add your files below.';
+  else msg = files.length + (files.length === 1 ? ' file' : ' files') + ' added. Tap “' + TASKS[currentTask].action + '” when you’re ready.';
+  setStatus(msg + (extra || ''));
+}
+/* The hint beside the Step 3 button follows state too. */
+function updateActionHint() {
+  const el = $('actionHint');
+  if (!el) return;
+  el.textContent = !currentTask ? 'Pick a task above to continue.'
+    : !files.length ? 'Add your files above, then tap the button.'
+    : 'Ready — tap the button.';
+}
 function fmtSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+function fmtTarget(kb) {
+  return kb >= 1024 ? (kb / 1024).toFixed(kb % 1024 ? 1 : 0) + ' MB' : kb + ' KB';
 }
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -77,7 +101,7 @@ function downloadBlob(blob, filename) {
 function setTargetKb(kb) {
   targetKb = Math.max(10, Math.min(51200, Math.round(kb) || 100));
   $('customKb').value = targetKb;
-  $('targetLabel').textContent = 'Target: ' + (targetKb >= 1024 ? (targetKb / 1024).toFixed(targetKb % 1024 ? 1 : 0) + ' MB' : targetKb + ' KB');
+  $('targetLabel').textContent = 'Target: ' + fmtTarget(targetKb);
   document.querySelectorAll('#sizePresets button').forEach((b) =>
     b.classList.toggle('active', Number(b.dataset.kb) === targetKb));
 }
@@ -142,6 +166,8 @@ function updateTaskUI() {
   renderConvertOptions();
   renderJoinOrder();
   renderSplitPanel();
+  updateStatusLine();
+  updateActionHint();
 }
 /* The "Change file type" task needs one choice: what to change to.
    Options follow the first file's kind, so only supported targets
@@ -191,22 +217,63 @@ dropzone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
 
 /* ---------- Sample file ---------- */
-/* "Try with a sample file": builds a small 1-page PDF in the browser
-   and adds it to the file list, so anyone can try a task without
-   having a file ready. Fixed lastModified so adding it twice in a
-   row is caught by the duplicate skip. */
+/* "Try with a sample file": builds a genuinely oversized sample PDF in
+   the browser — a photo-like JPEG (gradient + noise, ~300–500 KB)
+   embedded on 2 pages — so "Make a file smaller" can actually show
+   shrinking. Every click makes a DISTINCT file (numbered name, new
+   caption text, fresh timestamp) so the duplicate skip never blocks a
+   second click, and two samples can demo the Join task. */
 $('btnSample').addEventListener('click', async () => {
   if (!PDFLib) { setStatus('The PDF library did not load. Check your connection and reload.', true); return; }
   try {
+    sampleCount++;
+    const n = sampleCount;
+    const photoBlob = await makeSamplePhoto(n);
+    const photoBytes = await photoBlob.arrayBuffer();
     const doc = await PDFLib.PDFDocument.create();
-    await addTextPages(doc, 'This is a sample page from FileNora.\n\nUse it to try any task — make it smaller, save it as a photo, keep its page, or remove a word.\n\nYour real files work the same way, and they never leave your device.');
+    const img = await doc.embedJpg(photoBytes);
+    const helv = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+    for (let p = 1; p <= 2; p++) {
+      const page = doc.addPage([img.width, img.height]);
+      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+      page.drawRectangle({ x: 0, y: img.height - 110, width: img.width, height: 110, color: PDFLib.rgb(1, 1, 1), opacity: 0.92 });
+      page.drawText('FileNora sample file #' + n + ' — page ' + p + ' of 2', { x: 60, y: img.height - 55, size: 30, font: helv, color: PDFLib.rgb(0.06, 0.16, 0.26) });
+      page.drawText('Try "Make a file smaller" with this file — it is big enough to shrink.', { x: 60, y: img.height - 92, size: 20, font: helv, color: PDFLib.rgb(0.06, 0.16, 0.26) });
+    }
     const bytes = await doc.save();
-    const sample = new File([bytes], 'filenora-sample.pdf', { type: 'application/pdf', lastModified: 1700000000000 });
+    const sample = new File([bytes], 'filenora-sample-' + n + '.pdf', { type: 'application/pdf', lastModified: Date.now() + n });
     await handleFiles([sample]);
   } catch (err) {
     setStatus('Could not make the sample file: ' + (err && err.message ? err.message : 'unknown error'), true);
   }
 });
+/* A photo-like image: a colour gradient covered in thousands of small
+   random shapes, so the JPEG has real entropy (and real size) instead
+   of compressing down to a few KB like flat text would. */
+function makeSamplePhoto(n) {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200; canvas.height = 1500;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 1200, 1500);
+    grad.addColorStop(0, '#1c5d8f');
+    grad.addColorStop(0.5, '#3a8f7a');
+    grad.addColorStop(1, '#e8b64c');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1200, 1500);
+    for (let i = 0; i < 15000; i++) {
+      ctx.fillStyle = 'rgba(' + (Math.random() * 255 | 0) + ',' + (Math.random() * 255 | 0) + ',' + (Math.random() * 255 | 0) + ',' + (Math.random() * 0.25).toFixed(2) + ')';
+      ctx.fillRect(Math.random() * 1200, Math.random() * 1500, 2 + Math.random() * 14, 2 + Math.random() * 14);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 64px Arial';
+    ctx.fillText('FileNora sample #' + n, 80, 200);
+    ctx.font = '36px Arial';
+    ctx.fillText('Try "Make a file smaller" with this file.', 80, 280);
+    ctx.fillText('It is already big enough to shrink.', 80, 340);
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not make the sample photo.'))), 'image/jpeg', 0.9);
+  });
+}
 
 async function handleFiles(fileList) {
   const list = Array.from(fileList || []);
@@ -260,18 +327,20 @@ async function handleFiles(fileList) {
     files.push(item);
     added++;
   }
-  /* Status always reports the TOTAL in the list, not just this batch. */
+  /* Status always reports the TOTAL in the list, not just this batch,
+     and follows state (task picked / files added). A duplicate-skip
+     note is appended, never shown on its own. */
   const dupeNote = skippedDupes.length
     ? ' ' + skippedDupes.map((n) => '“' + n + '” is already added — skipped.').join(' ')
     : '';
   if (added) {
-    setStatus(files.length + (files.length === 1 ? ' file' : ' files') + ' added.' + dupeNote);
     joinOrder = files.map((f) => f.id);
     renderAll();
+    updateStatusLine(dupeNote);
   } else if (skippedDupes.length) {
     /* Nothing new was added, but the status must still show the total
        count — not just the skip note. */
-    setStatus(files.length + (files.length === 1 ? ' file' : ' files') + ' added.' + dupeNote);
+    updateStatusLine(dupeNote);
   }
 }
 
@@ -418,10 +487,18 @@ $('btnAction').addEventListener('click', async () => {
     openEditor(pdf);
     return;
   }
+  /* Task-specific checks BEFORE the spinner, so an error never
+     flashes "Working…" first. */
+  if (task === 'join' && files.length < 2) { setStatus('Joining needs 2 or more files. Add another file.', true); return; }
+  if (task === 'jpg2pdf' && !files.some((f) => f.kind === 'image')) { setStatus('Add a photo first — JPG, PNG or WebP.', true); return; }
+  if (task === 'pdf2jpg' && !files.some((x) => x.kind === 'pdf')) { setStatus('Add a PDF first.', true); return; }
+  if (task === 'rotate' && !files.some((x) => x.kind === 'pdf')) { setStatus('Add a PDF first.', true); return; }
   setWorking(true, WORKING_TEXT[task] || 'Working…');
+  /* Let the browser paint the spinner before the heavy work starts —
+     otherwise the user sees nothing happen on a big file. */
+  await new Promise((r) => setTimeout(r, 0));
   try {
     if (task === 'join') {
-      if (files.length < 2) { setStatus('Joining needs 2 or more files. Add another file.', true); return; }
       /* Fresh run: drop the previous run's outputs first. */
       clearOutputs();
       await doMerge();
@@ -429,7 +506,6 @@ $('btnAction').addEventListener('click', async () => {
     }
     if (task === 'jpg2pdf') {
       const imgs = files.filter((f) => f.kind === 'image');
-      if (!imgs.length) { setStatus('Add a photo first — JPG, PNG or WebP.', true); return; }
       clearOutputs();
       await imagesToPdf(imgs);
       return;
@@ -437,7 +513,6 @@ $('btnAction').addEventListener('click', async () => {
     if (task === 'pdf2jpg') {
       const fmt = $('pdf2jpgFormat').value || 'jpg';
       const pdfs = files.filter((x) => x.kind === 'pdf');
-      if (!pdfs.length) { setStatus('Add a PDF first.', true); return; }
       clearOutputs();
       for (const f of pdfs) await pdfToImages(f, fmt);
       setResult('Done — ' + pdfs.reduce((n, f) => n + f.pageCount, 0) + ' photo(s) saved from your PDF.');
@@ -459,7 +534,6 @@ $('btnAction').addEventListener('click', async () => {
     if (task === 'rotate') {
       const angle = Number($('rotateAngle').value) || 90;
       const pdfs = files.filter((x) => x.kind === 'pdf');
-      if (!pdfs.length) { setStatus('Add a PDF first.', true); return; }
       clearOutputs();
       for (const f of pdfs) await rotatePdf(f, angle);
       setResult('Done — ' + pdfs.length + ' PDF(s) turned by ' + angle + '°.');
@@ -471,23 +545,29 @@ $('btnAction').addEventListener('click', async () => {
     setWorking(false);
   }
 });
-/* Plain-language summary after "Make a file smaller". When the target
-   was not reached, it says so and suggests the next size up. */
+/* Plain-language summary after "Make a file smaller". The result line
+   always shows both sizes, and never claims "Target reached" when the
+   file grew or was already small — those cases get their own honest
+   line, recorded per file in compressResults. */
 function summarizeCompress() {
   if (!pendingOutputs.length) return;
-  if (pendingOutputs.length === 1) {
-    const o = pendingOutputs[0];
-    const reached = (o.note || '').includes('Target reached.');
-    const size = fmtSize(o.blob.size);
-    if (reached) {
-      setResult('Done — your file is ' + size + ', under your ' + targetKb + ' KB limit.');
-    } else {
-      const bigger = [50, 100, 150, 200, 250, 300, 500, 1024].find((p) => p > targetKb) || targetKb * 2;
-      setResult("Done — your file is " + size + ". It can't go below that and stay readable — try a bigger target like " + bigger + " KB.");
-    }
+  if (pendingOutputs.length === 1 && compressResults.length === 1) {
+    setResult(compressResults[0].text);
     return;
   }
-  setResult('Done — ' + pendingOutputs.length + ' files made smaller.');
+  const kinds = compressResults.map((r) => r.kind);
+  const already = kinds.filter((k) => k === 'already').length;
+  const grew = kinds.filter((k) => k === 'grew').length;
+  const shrunk = kinds.filter((k) => k === 'reached' || k === 'notreached').length;
+  if (already === kinds.length && kinds.length) {
+    setResult('Done — all ' + kinds.length + ' files were already under your ' + fmtTarget(targetKb) + ' target, so nothing needed shrinking.');
+    return;
+  }
+  let line = 'Done — ' + pendingOutputs.length + ' files ready.';
+  if (shrunk) line += ' ' + shrunk + (shrunk === 1 ? ' was' : ' were') + ' made smaller.';
+  if (already) line += ' ' + already + (already === 1 ? ' was' : ' were') + ' already small enough.';
+  if (grew) line += ' ' + grew + ' came out bigger, so we kept your original' + (grew === 1 ? '' : 's') + ' for ' + (grew === 1 ? 'it' : 'them') + '.';
+  setResult(line);
 }
 /* Start over: clear files and outputs and go back to Step 1. */
 function startOver() {
@@ -496,7 +576,6 @@ function startOver() {
   clearOutputs();
   renderAll();
   $('taskHint').textContent = 'Pick a task above first, then add your files here.';
-  setStatus('Ready. Pick what you want to do above, then add your files.');
   document.getElementById('tasks').scrollIntoView({ behavior: 'smooth' });
 }
 $('btnStartOver').addEventListener('click', startOver);
@@ -644,8 +723,27 @@ async function pdfToText(f) {
 }
 
 /* ---------- Compress ---------- */
+/* Two honest guards, because re-rendering a PDF as images can make a
+   tiny file BIGGER (a 1.1 KB text PDF re-rendered as JPEG pages came
+   out at 11.8 KB):
+   1. If the file is already at or under the target, do NOT re-encode
+      it — offer the original file back and say so plainly.
+   2. If the compressed version ends up LARGER than the original, do
+      NOT present it as a success — offer the original instead.
+   Each file records its outcome in compressResults so the result line
+   can say what actually happened, with both sizes. */
 async function compressFile(f, kb) {
   const targetBytes = kb * 1024;
+  const alreadyText = 'Already smaller than ' + fmtTarget(kb) + ' — your file is ' + fmtSize(f.size) + ', so there is nothing to shrink.';
+  const offerOriginal = (note, kind, text) => {
+    compressResults.push({ kind, text });
+    const blob = f.kind === 'pdf' && f.arrayBuffer ? new Blob([f.arrayBuffer]) : f.file;
+    prepareDownload(blob, f.name, note, [f.id]);
+  };
+  if (f.size <= targetBytes) {
+    offerOriginal('Already under ' + fmtTarget(kb) + ' — this is your original file, unchanged.', 'already', alreadyText);
+    return;
+  }
   if (f.kind === 'image') {
     // Try lower JPEG/WebP quality, then smaller dimensions, until under target.
     let quality = 0.92, scale = 1, best = null;
@@ -659,7 +757,16 @@ async function compressFile(f, kb) {
     }
     if (!best) throw new Error('Could not compress that image.');
     const ext = f.ext === 'png' ? 'png' : 'jpg';
+    if (best.size > f.size) {
+      offerOriginal('Original file — the compressed version was bigger (' + fmtSize(best.size) + ').', 'grew',
+        'We couldn’t make it smaller — the smallest readable version is ' + fmtSize(best.size) + ', bigger than your original ' + fmtSize(f.size) + '. Download your original file instead.');
+      return;
+    }
     const reached = best.size <= targetBytes;
+    compressResults.push({ kind: reached ? 'reached' : 'notreached',
+      text: reached
+        ? 'Done — your file is ' + fmtSize(best.size) + ' (was ' + fmtSize(f.size) + '), under your ' + fmtTarget(kb) + ' limit.'
+        : 'Done — your file is ' + fmtSize(best.size) + ' (was ' + fmtSize(f.size) + '). It can’t go below that and stay readable — try a bigger target like ' + fmtTarget(nextPreset(kb)) + '.' });
     prepareDownload(best, baseName(f.name) + '-compressed.' + ext,
       'Compressed ' + f.name + ' to ' + fmtSize(best.size) + ' (target ' + kb + ' KB). ' +
       (reached ? 'Target reached.' : 'Target not reached — this is the smallest we could make it without losing too much quality.'), [f.id]);
@@ -688,7 +795,16 @@ async function compressFile(f, kb) {
       if (bytes.length <= targetBytes) break;
       if (quality > 0.35) quality -= 0.15; else scale *= 0.7;
     }
+    if (bestSize > f.size) {
+      offerOriginal('Original file — the compressed version was bigger (' + fmtSize(bestSize) + ').', 'grew',
+        'We couldn’t make it smaller — the smallest readable version is ' + fmtSize(bestSize) + ', bigger than your original ' + fmtSize(f.size) + '. Download your original file instead.');
+      return;
+    }
     const reached = bestSize <= targetBytes;
+    compressResults.push({ kind: reached ? 'reached' : 'notreached',
+      text: reached
+        ? 'Done — your file is ' + fmtSize(bestSize) + ' (was ' + fmtSize(f.size) + '), under your ' + fmtTarget(kb) + ' limit.'
+        : 'Done — your file is ' + fmtSize(bestSize) + ' (was ' + fmtSize(f.size) + '). It can’t go below that and stay readable — try a bigger target like ' + fmtTarget(nextPreset(kb)) + '.' });
     prepareDownload(new Blob([bestBytes], { type: 'application/pdf' }), baseName(f.name) + '-compressed.pdf',
       'Compressed ' + f.name + ' to ' + fmtSize(bestSize) + ' (target ' + kb + ' KB). ' +
       (reached ? 'Target reached.' : 'Target not reached — this is the smallest we could make it while keeping the pages readable. Note: re-rendered PDFs become images, so their text is no longer selectable.'), [f.id]);
@@ -698,11 +814,24 @@ async function compressFile(f, kb) {
     const out = await PDFLib.PDFDocument.create();
     await addTextPages(out, f.text || '');
     const bytes = await out.save();
+    if (bytes.length > f.size) {
+      offerOriginal('Original file — the PDF version was bigger (' + fmtSize(bytes.length) + ').', 'grew',
+        'We couldn’t make it smaller — the smallest readable version is ' + fmtSize(bytes.length) + ', bigger than your original ' + fmtSize(f.size) + '. Download your original file instead.');
+      return;
+    }
+    compressResults.push({ kind: 'reached',
+      text: 'Done — your file is ' + fmtSize(bytes.length) + ' (was ' + fmtSize(f.size) + '), under your ' + fmtTarget(kb) + ' limit.' });
     prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(f.name) + '.pdf',
       'Converted ' + f.name + ' to PDF (' + fmtSize(bytes.length) + '). Text files are already small, so there is little to compress.', [f.id]);
     return;
   }
   setStatus('Compress is not supported for that file type in v1.', true);
+}
+/* Next size preset above the current target, for the "try a bigger
+   target" suggestion. */
+function nextPreset(kb) {
+  const presets = [50, 100, 150, 200, 250, 300, 500, 1024];
+  return presets.find((p) => p > kb) || kb * 2;
 }
 async function imageToFormatScaled(f, quality, scale) {
   const fmt = f.ext === 'png' ? 'png' : 'jpg';
@@ -804,14 +933,23 @@ $('btnDoSplit').addEventListener('click', async () => {
   if (!splitFile) return;
   const chosen = Array.from(document.querySelectorAll('#splitPages input:checked')).map((c) => Number(c.value) - 1);
   if (!chosen.length) { setStatus('Tick at least one page to keep.', true); return; }
-  const src = await loadPdfLibDoc(splitFile);
-  const out = await PDFLib.PDFDocument.create();
-  const pages = await out.copyPages(src, chosen);
-  pages.forEach((p) => out.addPage(p));
-  const bytes = await out.save();
-  prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(splitFile.name) + '-split.pdf',
-    'Kept ' + chosen.length + ' page(s) from ' + splitFile.name + ' (' + fmtSize(bytes.length) + ').', [splitFile.id]);
-  setResult('Done — new PDF with ' + chosen.length + ' page(s) (' + fmtSize(bytes.length) + ').');
+  /* Show the working state first (and let it paint) — same as the
+     Step 3 button — so a big PDF does not look stuck. */
+  const btn = $('btnDoSplit');
+  btn.disabled = true; btn.textContent = 'Working…';
+  await new Promise((r) => setTimeout(r, 0));
+  try {
+    const src = await loadPdfLibDoc(splitFile);
+    const out = await PDFLib.PDFDocument.create();
+    const pages = await out.copyPages(src, chosen);
+    pages.forEach((p) => out.addPage(p));
+    const bytes = await out.save();
+    prepareDownload(new Blob([bytes], { type: 'application/pdf' }), baseName(splitFile.name) + '-split.pdf',
+      'Kept ' + chosen.length + ' page(s) from ' + splitFile.name + ' (' + fmtSize(bytes.length) + ').', [splitFile.id]);
+    setResult('Done — new PDF with ' + chosen.length + ' page(s) (' + fmtSize(bytes.length) + ').');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Keep these pages';
+  }
 });
 
 /* ---------- Download: 10-second countdown, no bypass ---------- */
@@ -830,6 +968,7 @@ function setResult(text) {
 }
 function clearOutputs() {
   pendingOutputs = [];
+  compressResults = [];
   resultText = '';
   if ($('resultLine')) $('resultLine').hidden = true;
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
@@ -1069,5 +1208,4 @@ $('btnSaveEdit').addEventListener('click', async () => {
 
 /* ---------- Init ---------- */
 setTargetKb(100);
-updateTaskUI(); /* no task picked yet: action button waits for Step 1 */
-setStatus('Ready. Pick what you want to do above, then add your files — no sign-in, and your files never leave your device.');
+updateTaskUI(); /* no task picked yet: action button waits for Step 1; status line set by updateTaskUI */
