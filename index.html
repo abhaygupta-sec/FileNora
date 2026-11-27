@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dockora — Free PDF &amp; File Tools Online</title>
+<meta name="description" content="Dockora is a free, private PDF and file tool. Merge, split, compress, convert and edit PDFs and images in your browser. No sign-up. Your files never leave your device.">
+<meta property="og:title" content="Dockora — Free PDF &amp; File Tools Online">
+<meta property="og:description" content="Merge, compress, convert and edit PDFs and images — free, no sign-up, files stay on your device.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0F2A43">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F2A43'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="logo" href="index.html"><span class="logo-mark">D</span> Dockora</a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#tools">Tools</a>
+      <a href="#workspace">Workspace</a>
+      <a href="#guides">Guides</a>
+      <a href="#faq">FAQ</a>
+      <a href="#about">About</a>
+    </nav>
+    <span class="header-badge">Free &middot; No sign-up</span>
+  </div>
+</header>
+
+<main>
+  <!-- Hero -->
+  <section class="hero wrap">
+    <h1>Every file, one place.</h1>
+    <p class="hero-sub">Merge, compress, convert and edit PDFs, photos and documents — free, in your browser. No account, no upload, no watermark.</p>
+    <p class="hero-points">Your files never leave your device &middot; Works on phone and computer &middot; No sign-in</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-large" href="#workspace">Choose files to start</a>
+      <a class="btn btn-secondary btn-large" href="#tools">See all tools</a>
+    </div>
+  </section>
+
+  <!-- Ad slot 1: top banner -->
+  <div class="wrap">
+    <div class="ad-slot" role="complementary" aria-label="Advertisement">
+      <span class="ad-label">Advertisement</span>
+      <span class="ad-text">Ad placeholder — real AdSense code goes here after domain + approval.</span>
+    </div>
+  </div>
+
+  <!-- Tools grid -->
+  <section id="tools" class="wrap section">
+    <h2>Free PDF &amp; file tools</h2>
+    <p class="section-sub">Pick a tool. Your files are processed on your own device.</p>
+    <div class="tools-grid" id="toolsGrid">
+      <button class="tool-card" data-job="merge"><span class="tool-title">Merge PDF</span><span class="tool-desc">Combine several PDFs or images into one PDF, in the order you choose.</span></button>
+      <button class="tool-card" data-job="split"><span class="tool-title">Split PDF</span><span class="tool-desc">Extract the pages you want into a new PDF.</span></button>
+      <button class="tool-card" data-job="compress"><span class="tool-title">Compress PDF to exact size</span><span class="tool-desc">Shrink a PDF to 50 KB, 100 KB, 200 KB or any size you set.</span></button>
+      <button class="tool-card" data-job="jpg2pdf"><span class="tool-title">JPG to PDF</span><span class="tool-desc">Turn JPG, PNG or WebP photos into one PDF.</span></button>
+      <button class="tool-card" data-job="pdf2jpg"><span class="tool-title">PDF to JPG</span><span class="tool-desc">Save PDF pages as JPG or PNG images.</span></button>
+      <button class="tool-card" data-job="convert"><span class="tool-title">Convert files</span><span class="tool-desc">PDF, JPG, PNG, WebP, TXT and DOCX to PDF — and more.</span></button>
+      <button class="tool-card" data-job="edit"><span class="tool-title">Edit PDF</span><span class="tool-desc">Cover a word with whiteout, or add new text on a page.</span></button>
+      <button class="tool-card" data-job="rotate"><span class="tool-title">Rotate PDF</span><span class="tool-desc">Turn PDF pages 90&deg; at a time.</span></button>
+      <button class="tool-card" data-job="resize"><span class="tool-title">Image resize to exact KB</span><span class="tool-desc">Resize a photo to 20 KB, 50 KB, 100 KB or a size you choose.</span></button>
+      <button class="tool-card" data-job="pdf2txt"><span class="tool-title">PDF to TXT</span><span class="tool-desc">Extract the text from a PDF into a plain text file.</span></button>
+    </div>
+  </section>
+
+  <!-- Ad slot 2: between tools and workspace -->
+  <div class="wrap">
+    <div class="ad-slot" role="complementary" aria-label="Advertisement">
+      <span class="ad-label">Advertisement</span>
+      <span class="ad-text">Ad placeholder — real AdSense code goes here after domain + approval.</span>
+    </div>
+  </div>
+
+  <!-- Workspace -->
+  <section id="workspace" class="wrap section">
+    <h2>Workspace</h2>
+    <p class="section-sub">Step 1: add your files. Step 2: pick what to do. Step 3: wait 10 seconds, then download.</p>
+
+    <div class="job-bar">
+      <label for="jobSelect"><strong>What do you want to do?</strong></label>
+      <select id="jobSelect">
+        <option value="merge">Merge files into one PDF</option>
+        <option value="compress">Compress to an exact size</option>
+        <option value="convert">Convert files</option>
+        <option value="split">Split PDF — extract pages</option>
+        <option value="edit">Edit PDF — whiteout / add text</option>
+        <option value="rotate">Rotate PDF</option>
+        <option value="jpg2pdf">JPG / PNG / WebP to PDF</option>
+        <option value="pdf2jpg">PDF to JPG / PNG</option>
+        <option value="resize">Resize image to exact KB</option>
+        <option value="pdf2txt">PDF to TXT</option>
+      </select>
+      <span id="jobHint" class="job-hint">Add 2 or more files, then choose Merge or Separate.</span>
+    </div>
+
+    <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Choose files">
+      <p class="drop-title">Drop files here, or click to choose files</p>
+      <p class="drop-sub">PDF, JPG, PNG, WebP, DOCX, TXT &middot; Up to 50 MB per file &middot; Multiple files welcome</p>
+      <button type="button" class="btn btn-primary btn-large" id="chooseBtn">Choose files</button>
+      <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.txt" hidden>
+    </div>
+    <p id="statusMsg" class="status" role="status" aria-live="polite"></p>
+
+    <!-- Merge prompt: shown when 2+ files are added -->
+    <div id="mergePrompt" class="panel merge-prompt" hidden>
+      <h3>You added more than one file.</h3>
+      <p>Do you want each file kept separate, or merged into one PDF?</p>
+      <div class="row">
+        <button type="button" class="btn btn-primary" id="btnSeparate">Keep separate</button>
+        <button type="button" class="btn btn-secondary" id="btnMerge">Merge into one PDF</button>
+      </div>
+      <div id="mergeOrder" hidden>
+        <h4>Choose the order — drag, or use the up / down buttons</h4>
+        <ol id="mergeOrderList" class="order-list"></ol>
+        <div class="row">
+          <button type="button" class="btn btn-primary" id="btnDoMerge">Merge in this order</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelMerge">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Target size -->
+    <div class="panel">
+      <h3>Target size <span class="muted">(for Compress / Resize)</span></h3>
+      <p class="muted">Pick a size, or type your own. We aim for just under your target and show the real final size. An exact size is not always possible — if we cannot reach it, we will say so plainly.</p>
+      <div class="size-presets" id="sizePresets" role="group" aria-label="Target size presets">
+        <button type="button" data-kb="50">50 KB</button>
+        <button type="button" data-kb="100" class="active">100 KB</button>
+        <button type="button" data-kb="150">150 KB</button>
+        <button type="button" data-kb="200">200 KB</button>
+        <button type="button" data-kb="250">250 KB</button>
+        <button type="button" data-kb="300">300 KB</button>
+        <button type="button" data-kb="500">500 KB</button>
+        <button type="button" data-kb="1024">1 MB</button>
+      </div>
+      <label class="custom-size">Custom size (KB)
+        <input type="number" id="customKb" min="10" max="51200" value="100" inputmode="numeric">
+      </label>
+      <span id="targetLabel" class="target-label">Target: 100 KB</span>
+    </div>
+
+    <!-- File list + previews -->
+    <div id="fileList" class="file-list"></div>
+    <div id="previewArea" class="preview-area"></div>
+
+    <!-- Split panel -->
+    <div id="splitPanel" class="panel" hidden>
+      <h3>Split PDF — pick pages to keep</h3>
+      <p class="muted">Tick the pages you want in the new PDF, then click Extract.</p>
+      <div id="splitPages" class="split-pages"></div>
+      <div class="row">
+        <button type="button" class="btn btn-primary" id="btnDoSplit">Extract selected pages</button>
+        <button type="button" class="btn btn-secondary" id="btnCloseSplit">Close</button>
+      </div>
+    </div>
+
+    <!-- Global actions -->
+    <div class="panel actions-panel">
+      <h3>Do it</h3>
+      <p class="muted">This runs the job selected above, on the files you added. Each file also has its own buttons in its card below.</p>
+      <div class="row wrap-row">
+        <button type="button" class="btn btn-primary" id="btnRunJob">Run selected job</button>
+        <button type="button" class="btn btn-secondary" id="btnClearAll">Clear all files</button>
+      </div>
+    </div>
+
+    <!-- Download / wait panel -->
+    <div id="downloadPanel" class="panel download-panel" hidden>
+      <h3>Your file is ready</h3>
+      <p id="outputInfo" class="muted"></p>
+      <div class="ad-slot ad-inline" role="complementary" aria-label="Advertisement">
+        <span class="ad-label">Advertisement</span>
+        <span class="ad-text">Ad placeholder — real AdSense code goes here after domain + approval.</span>
+      </div>
+      <p class="countdown" id="countdownText">Download unlocks in 10 seconds…</p>
+      <div id="outputList" class="output-list"></div>
+      <p class="muted small">Please wait — the download button unlocks after the countdown. This keeps Dockora free.</p>
+    </div>
+  </section>
+
+  <!-- Editor modal -->
+  <div id="editorModal" class="modal" hidden role="dialog" aria-modal="true" aria-label="Edit PDF">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="editorTitle">Edit PDF</h3>
+        <button type="button" class="btn btn-secondary" id="btnCloseEditor">Close</button>
+      </div>
+      <p class="muted">Whiteout: drag a rectangle over a word to cover it. Add text: click a spot on the page, type your text, then click “Place text”. Font match is best-effort — the original font is often embedded in the PDF and cannot be matched exactly.</p>
+      <div class="editor-controls">
+        <label>Page
+          <select id="editorPageSelect"></select>
+        </label>
+        <div class="mode-buttons" role="group" aria-label="Edit mode">
+          <button type="button" id="modeWhiteout" class="btn btn-primary btn-small">Whiteout</button>
+          <button type="button" id="modeText" class="btn btn-secondary btn-small">Add text</button>
+        </div>
+        <label>Text <input type="text" id="editTextInput" placeholder="Type replacement text"></label>
+        <label>Size <input type="number" id="editSize" value="12" min="6" max="72"></label>
+        <label>Colour <input type="color" id="editColor" value="#000000"></label>
+        <button type="button" class="btn btn-secondary btn-small" id="btnPlaceText">Place text</button>
+        <button type="button" class="btn btn-secondary btn-small" id="btnClearEdits">Clear edits on this page</button>
+      </div>
+      <p id="detectedInfo" class="muted small"></p>
+      <div class="editor-canvas-wrap" id="editorCanvasWrap">
+        <canvas id="editorCanvas"></canvas>
+        <canvas id="editorOverlay"></canvas>
+      </div>
+      <div class="row">
+        <button type="button" class="btn btn-primary" id="btnSaveEdit">Save edited PDF</button>
+        <span class="muted small">Saving creates a new PDF with your whiteouts and text applied.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guides -->
+  <section id="guides" class="wrap section">
+    <h2>How to do common jobs</h2>
+    <article class="guide">
+      <h3>Compress PDF to 100 KB</h3>
+      <p>Add your PDF, choose “Compress to an exact size”, pick 100 KB, and click Run. Dockora re-renders the pages at lower quality until the file fits just under 100 KB. If the file cannot reach 100 KB without becoming unreadable, Dockora shows the smallest size it could reach and says so.</p>
+    </article>
+    <article class="guide">
+      <h3>Merge PDF</h3>
+      <p>Add two or more PDFs, choose “Merge into one PDF”, drag the files into the order you want — first, second, third — then click Merge. You get one PDF, in that order.</p>
+    </article>
+    <article class="guide">
+      <h3>JPG to PDF</h3>
+      <p>Add JPG, PNG or WebP photos, choose “JPG / PNG / WebP to PDF”, and click Run. Each photo becomes a page in one PDF, in the order you added them.</p>
+    </article>
+    <article class="guide">
+      <h3>PDF to JPG</h3>
+      <p>Add a PDF, choose “PDF to JPG / PNG”, pick JPG or PNG, and click Run. Each page is saved as an image you can download.</p>
+    </article>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="wrap section">
+    <h2>Frequently asked questions</h2>
+    <details><summary>Is Dockora really free?</summary><p>Yes. All tools on this page are free. There is a 10-second wait before a download unlocks — that is how the site stays free.</p></details>
+    <details><summary>Do my files get uploaded anywhere?</summary><p>No. Every tool runs in your browser, on your device. Your files never leave your device, and nothing is stored on a server.</p></details>
+    <details><summary>Do I need an account?</summary><p>No. There is no sign-in, no account, and no email required.</p></details>
+    <details><summary>Can I get an exact file size, like exactly 100 KB?</summary><p>Usually we can get just under your target, but not always exactly. Text-heavy PDFs compress well; scanned photos may not reach a very small target. We always show the real final size and tell you honestly if the target was not reached.</p></details>
+    <details><summary>Why can’t the edited text match the original font exactly?</summary><p>PDFs often embed their original font, which the browser cannot reuse. Dockora detects the approximate size and colour of the text on the page and uses the closest standard font. The match is best-effort.</p></details>
+    <details><summary>What file types can I use?</summary><p>In this version: PDF, JPG, JPEG, PNG, WebP, DOCX and TXT.</p></details>
+  </section>
+
+  <!-- About / Privacy -->
+  <section id="about" class="wrap section">
+    <h2>About Dockora</h2>
+    <p>Dockora is a free, private file tool for everyone. It was built to do the everyday jobs — merge a PDF, shrink a photo to the size a form asks for, turn a photo into a PDF — without an account, without an upload, and without a watermark.</p>
+    <h3>Privacy</h3>
+    <p>Your files are processed locally in your browser. Dockora does not upload, store, or see your files. Closing the tab removes them from memory.</p>
+    <h3>Contact</h3>
+    <p>Questions or a problem with a tool? Email: <a href="mailto:hello@dockora.com">hello@dockora.com</a> (replace with your real support address once the domain is live).</p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p><strong>Dockora</strong> — Every file, one place.</p>
+    <p class="muted small">Free PDF &amp; file tools. No sign-in. Your files never leave your device.</p>
+    <nav aria-label="Footer">
+      <a href="#tools">Tools</a> &middot; <a href="#guides">Guides</a> &middot; <a href="#faq">FAQ</a> &middot; <a href="#about">About &amp; Privacy</a> &middot; <a href="mailto:hello@dockora.com">Contact</a>
+    </nav>
+    <p class="muted small">&copy; 2026 Dockora. All processing happens in your browser.</p>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
