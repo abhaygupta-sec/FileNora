@@ -359,17 +359,23 @@ function renderFileList() {
     const meta = f.kind === 'pdf' ? f.pageCount + (f.pageCount === 1 ? ' page' : ' pages')
       : f.kind === 'docx' || f.kind === 'text' ? 'Text document'
       : 'Image';
-    /* A file card shows only what the file is — name, kind, size —
-       and a Remove button. Every action lives on the one big button
-       in Step 3, so there is only one path to each job. */
+    /* A file card shows what the file is — name, kind, size — plus
+       Edit (images and PDFs only) and Remove. Every job still runs
+       from the one big button in Step 3; Edit is the step before a
+       job, not a job itself. DOCX / TXT get no Edit button: pixel and
+       PDF editing does not apply to them. */
     card.innerHTML =
       '<h4>' + esc(f.name) + '</h4>' +
       '<p class="file-meta">' + esc(meta) + ' &middot; ' + esc(f.ext.toUpperCase()) + ' &middot; ' + fmtSize(f.size) + '</p>' +
       '<div class="file-actions">' +
+        ((f.kind === 'image' || f.kind === 'pdf') ? '<button type="button" class="btn btn-secondary btn-small" data-act="edit">Edit</button>' : '') +
         '<button type="button" class="btn btn-secondary btn-small" data-act="remove">Remove</button>' +
       '</div>';
     card.querySelectorAll('[data-act="remove"]').forEach((btn) => {
       btn.addEventListener('click', () => removeFile(f));
+    });
+    card.querySelectorAll('[data-act="edit"]').forEach((btn) => {
+      btn.addEventListener('click', () => openFileEditor(f));
     });
     wrap.appendChild(card);
   });
@@ -1204,6 +1210,360 @@ $('btnSaveEdit').addEventListener('click', async () => {
   } catch (err) {
     setStatus('Could not save the edited PDF: ' + (err && err.message ? err.message : 'unknown error'), true);
   }
+});
+
+/* ---------- Edit image: crop, rotate/flip, resize, adjust, filters, text ---------- */
+/* The image editor works on one file at a time, in a modal. Its working
+   state (imgEd) holds a base canvas with the current pixels — rotate,
+   flip, crop and resize are baked into that canvas as they happen —
+   plus live settings (adjust sliders, filter, placed text) drawn on top
+   at render time. Text positions are fractions of the canvas, so they
+   survive rotate, flip, crop and resize. "Done" exports the canvas back
+   into the same file slot (same id, name and list position); "Cancel"
+   throws the edits away. DOCX / TXT have no editor: pixel and PDF
+   editing does not apply to them. */
+let imgEd = null;        // working state for the image being edited
+let imgEdCropDrag = null; // {fx, fy} while dragging a crop box
+
+/* One Edit button, two editors: PDFs open the existing PDF editor
+   (whiteout + add text), images open the image editor below. */
+function openFileEditor(f) {
+  if (f.kind === 'pdf') { openEditor(f); return; }
+  if (f.kind === 'image') { openImageEditor(f); return; }
+  /* DOCX / TXT: no Edit button is shown for these, so this is only a
+     safety net — nothing to open. */
+}
+
+async function openImageEditor(f) {
+  const img = new Image();
+  try {
+    await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('Could not load that image.')); img.src = f.dataUrl; });
+  } catch (err) {
+    setStatus('Could not open the editor: ' + (err && err.message ? err.message : 'unknown error'), true);
+    return;
+  }
+  const base = document.createElement('canvas');
+  base.width = img.naturalWidth || img.width || 1;
+  base.height = img.naturalHeight || img.height || 1;
+  base.getContext('2d').drawImage(img, 0, 0);
+  imgEd = {
+    file: f, img, base, w: base.width, h: base.height,
+    filter: 'none', bright: 1, contrast: 1, sat: 1,
+    texts: [], history: [], crop: null, cropMode: false, textMode: false,
+    pendingText: null, adjusting: false
+  };
+  $('imgEditorTitle').textContent = 'Edit image — ' + f.name;
+  $('imgWidth').value = imgEd.w;
+  $('imgHeight').value = imgEd.h;
+  imgEdSyncAdjustInputs();
+  $('imgTextInput').value = '';
+  $('imgEditorInfo').textContent = imgEd.w + ' × ' + imgEd.h + ' px — ' + fmtSize(f.size) + '. Edits stay on your device until you tap Done.';
+  $('imgEditorModal').hidden = false;
+  imgEdSetCropMode(false);
+  imgEdSetTextMode(false);
+  drawImgEditor();
+}
+function imgEdFilterString() {
+  if (!imgEd) return 'none';
+  const parts = [];
+  if (imgEd.bright !== 1) parts.push('brightness(' + imgEd.bright + ')');
+  if (imgEd.contrast !== 1) parts.push('contrast(' + imgEd.contrast + ')');
+  if (imgEd.sat !== 1) parts.push('saturate(' + imgEd.sat + ')');
+  if (imgEd.filter === 'grayscale') parts.push('grayscale(1)');
+  if (imgEd.filter === 'sepia') parts.push('sepia(1)');
+  if (imgEd.filter === 'invert') parts.push('invert(1)');
+  return parts.join(' ') || 'none';
+}
+function drawImgEditor() {
+  if (!imgEd) return;
+  const canvas = $('imgEditorCanvas');
+  canvas.width = imgEd.w; canvas.height = imgEd.h;
+  const ctx = canvas.getContext('2d');
+  ctx.filter = imgEdFilterString();
+  ctx.drawImage(imgEd.base, 0, 0, imgEd.w, imgEd.h);
+  ctx.filter = 'none';
+  imgEd.texts.forEach((t) => {
+    ctx.font = 'bold ' + t.size + 'px Helvetica, Arial, sans-serif';
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.text, t.fx * imgEd.w, t.fy * imgEd.h);
+  });
+  if (imgEd.pendingText) {
+    ctx.strokeStyle = '#0E9F8A'; ctx.setLineDash([4, 4]);
+    ctx.strokeRect(imgEd.pendingText.fx * imgEd.w - 5, imgEd.pendingText.fy * imgEd.h - 5, 10, 10);
+    ctx.setLineDash([]);
+  }
+  if (imgEd.crop) {
+    const c = imgEd.crop;
+    /* Dim everything outside the crop box so the kept part is clear. */
+    ctx.fillStyle = 'rgba(15,42,67,0.25)';
+    ctx.fillRect(0, 0, imgEd.w, c.fy * imgEd.h);
+    ctx.fillRect(0, (c.fy + c.fh) * imgEd.h, imgEd.w, imgEd.h - (c.fy + c.fh) * imgEd.h);
+    ctx.fillRect(0, c.fy * imgEd.h, c.fx * imgEd.w, c.fh * imgEd.h);
+    ctx.fillRect((c.fx + c.fw) * imgEd.w, c.fy * imgEd.h, imgEd.w - (c.fx + c.fw) * imgEd.w, c.fh * imgEd.h);
+    ctx.strokeStyle = '#0E9F8A'; ctx.lineWidth = 2;
+    ctx.strokeRect(c.fx * imgEd.w, c.fy * imgEd.h, c.fw * imgEd.w, c.fh * imgEd.h);
+    ctx.lineWidth = 1;
+  }
+}
+/* Undo: each mutating action pushes a snapshot first (base canvas copy
+   + live settings + placed text). 20 steps max. */
+function imgEdSnapshot() {
+  const copy = document.createElement('canvas');
+  copy.width = imgEd.w; copy.height = imgEd.h;
+  copy.getContext('2d').drawImage(imgEd.base, 0, 0);
+  return {
+    base: copy, w: imgEd.w, h: imgEd.h,
+    filter: imgEd.filter, bright: imgEd.bright, contrast: imgEd.contrast, sat: imgEd.sat,
+    texts: imgEd.texts.map((t) => ({ ...t }))
+  };
+}
+function imgEdPushHistory() {
+  if (!imgEd) return;
+  imgEd.history.push(imgEdSnapshot());
+  if (imgEd.history.length > 20) imgEd.history.shift();
+}
+function imgEdUndo() {
+  if (!imgEd || !imgEd.history.length) return;
+  const s = imgEd.history.pop();
+  imgEd.base = s.base; imgEd.w = s.w; imgEd.h = s.h;
+  imgEd.filter = s.filter; imgEd.bright = s.bright; imgEd.contrast = s.contrast; imgEd.sat = s.sat;
+  imgEd.texts = s.texts;
+  imgEd.crop = null; imgEd.adjusting = false;
+  $('imgWidth').value = imgEd.w; $('imgHeight').value = imgEd.h;
+  imgEdSyncAdjustInputs();
+  drawImgEditor();
+}
+function imgEdSyncAdjustInputs() {
+  if (!imgEd) return;
+  $('imgBright').value = String(imgEd.bright);
+  $('imgContrast').value = String(imgEd.contrast);
+  $('imgSat').value = String(imgEd.sat);
+  document.querySelectorAll('.img-filter').forEach((b) => b.classList.toggle('active', b.dataset.filter === imgEd.filter));
+}
+async function imgEdReset() {
+  if (!imgEd) return;
+  const f = imgEd.file;
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = f.dataUrl; });
+  const base = document.createElement('canvas');
+  base.width = img.naturalWidth || img.width || 1;
+  base.height = img.naturalHeight || img.height || 1;
+  base.getContext('2d').drawImage(img, 0, 0);
+  imgEd.base = base; imgEd.w = base.width; imgEd.h = base.height;
+  imgEd.filter = 'none'; imgEd.bright = 1; imgEd.contrast = 1; imgEd.sat = 1;
+  imgEd.texts = []; imgEd.history = []; imgEd.crop = null; imgEd.adjusting = false;
+  $('imgWidth').value = imgEd.w; $('imgHeight').value = imgEd.h;
+  imgEdSyncAdjustInputs();
+  drawImgEditor();
+}
+/* Rotate: baked into the base canvas (dimensions swap), and placed
+   text moves with the image — a point at fraction (fx, fy) goes to
+   (1-fy, fx) for a clockwise turn, (fy, 1-fx) for anti-clockwise. */
+function imgEdRotate(dir) { // dir: +1 right (clockwise), -1 left
+  if (!imgEd) return;
+  imgEdPushHistory();
+  const oldW = imgEd.w, oldH = imgEd.h;
+  imgEd.w = oldH; imgEd.h = oldW;
+  const src = imgEd.base;
+  const next = document.createElement('canvas');
+  next.width = imgEd.w; next.height = imgEd.h;
+  const ctx = next.getContext('2d');
+  ctx.translate(imgEd.w / 2, imgEd.h / 2);
+  ctx.rotate(dir * Math.PI / 2);
+  ctx.drawImage(src, -oldW / 2, -oldH / 2, oldW, oldH);
+  imgEd.base = next;
+  imgEd.texts = imgEd.texts.map((t) => dir === 1
+    ? { ...t, fx: 1 - t.fy, fy: t.fx }
+    : { ...t, fx: t.fy, fy: 1 - t.fx });
+  $('imgWidth').value = imgEd.w; $('imgHeight').value = imgEd.h;
+  drawImgEditor();
+}
+function imgEdFlip(horizontal) {
+  if (!imgEd) return;
+  imgEdPushHistory();
+  const src = imgEd.base;
+  const next = document.createElement('canvas');
+  next.width = imgEd.w; next.height = imgEd.h;
+  const ctx = next.getContext('2d');
+  if (horizontal) { ctx.translate(imgEd.w, 0); ctx.scale(-1, 1); }
+  else { ctx.translate(0, imgEd.h); ctx.scale(1, -1); }
+  ctx.drawImage(src, 0, 0);
+  imgEd.base = next;
+  imgEd.texts = imgEd.texts.map((t) => horizontal ? { ...t, fx: 1 - t.fx } : { ...t, fy: 1 - t.fy });
+  drawImgEditor();
+}
+function imgEdSetFilter(name) {
+  if (!imgEd || imgEd.filter === name) return;
+  imgEdPushHistory();
+  imgEd.filter = name;
+  imgEdSyncAdjustInputs();
+  drawImgEditor();
+}
+/* Sliders preview live while dragging; one undo step is pushed at the
+   start of each drag, and cleared when the drag ends. */
+function imgEdSetAdjust(key, value) {
+  if (!imgEd) return;
+  if (!imgEd.adjusting) { imgEdPushHistory(); imgEd.adjusting = true; }
+  imgEd[key] = value;
+  drawImgEditor();
+}
+function imgEdEndAdjust() { if (imgEd) imgEd.adjusting = false; }
+function imgEdApplyResize() {
+  if (!imgEd) return;
+  let w = Math.round(Number($('imgWidth').value) || imgEd.w);
+  let h = Math.round(Number($('imgHeight').value) || imgEd.h);
+  if (w < 1 || h < 1) { setStatus('Width and height must be at least 1 pixel.', true); return; }
+  if ($('imgLockRatio').checked) {
+    /* With the lock on, the width wins and the height follows it. */
+    h = Math.max(1, Math.round(w * imgEd.h / imgEd.w));
+    $('imgHeight').value = h;
+  }
+  if (w === imgEd.w && h === imgEd.h) return;
+  imgEdPushHistory();
+  const next = document.createElement('canvas');
+  next.width = w; next.height = h;
+  next.getContext('2d').drawImage(imgEd.base, 0, 0, w, h);
+  imgEd.base = next; imgEd.w = w; imgEd.h = h;
+  drawImgEditor();
+}
+function imgEdSetCropMode(on) {
+  if (!imgEd) return;
+  imgEd.cropMode = on;
+  imgEd.crop = null;
+  $('btnImgCrop').classList.toggle('active', on);
+  $('btnImgCropApply').hidden = !on;
+  $('btnImgCropCancel').hidden = !on;
+  $('imgCropHint').hidden = !on;
+  $('imgEditorCanvas').classList.toggle('cropping', on);
+  if (on) imgEdSetTextMode(false);
+  drawImgEditor();
+}
+function imgEdSetTextMode(on) {
+  if (!imgEd) return;
+  imgEd.textMode = on;
+  imgEd.pendingText = null;
+  $('btnImgTextMode').classList.toggle('active', on);
+  $('imgEditorCanvas').classList.toggle('texting', on);
+  if (on) imgEdSetCropMode(false);
+  drawImgEditor();
+}
+function imgEdCanvasPos(e) {
+  const rect = $('imgEditorCanvas').getBoundingClientRect();
+  return {
+    fx: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+    fy: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+  };
+}
+function imgEdApplyCrop() {
+  if (!imgEd || !imgEd.crop) return;
+  const c = imgEd.crop;
+  if (c.fw < 0.01 || c.fh < 0.01) { setStatus('Drag a bigger box to crop.', true); return; }
+  imgEdPushHistory();
+  const cw = Math.max(1, Math.round(c.fw * imgEd.w));
+  const ch = Math.max(1, Math.round(c.fh * imgEd.h));
+  const next = document.createElement('canvas');
+  next.width = cw; next.height = ch;
+  next.getContext('2d').drawImage(imgEd.base, c.fx * imgEd.w, c.fy * imgEd.h, c.fw * imgEd.w, c.fh * imgEd.h, 0, 0, cw, ch);
+  imgEd.base = next;
+  /* Keep placed text that still falls inside the crop, re-based to the
+     new canvas; text outside the crop is dropped with the pixels. */
+  imgEd.texts = imgEd.texts
+    .map((t) => ({ ...t, fx: (t.fx - c.fx) / c.fw, fy: (t.fy - c.fy) / c.fh }))
+    .filter((t) => t.fx >= 0 && t.fx <= 1 && t.fy >= 0 && t.fy <= 1);
+  imgEd.w = cw; imgEd.h = ch;
+  $('imgWidth').value = cw; $('imgHeight').value = ch;
+  imgEdSetCropMode(false);
+  drawImgEditor();
+}
+$('imgEditorCanvas').addEventListener('pointerdown', (e) => {
+  if (!imgEd) return;
+  if (imgEd.cropMode) { imgEdCropDrag = imgEdCanvasPos(e); imgEd.crop = { fx: imgEdCropDrag.fx, fy: imgEdCropDrag.fy, fw: 0, fh: 0 }; drawImgEditor(); }
+  else if (imgEd.textMode) { imgEd.pendingText = imgEdCanvasPos(e); drawImgEditor(); $('imgTextInput').focus(); }
+});
+$('imgEditorCanvas').addEventListener('pointermove', (e) => {
+  if (!imgEd || !imgEd.cropMode || !imgEdCropDrag) return;
+  const cur = imgEdCanvasPos(e);
+  imgEd.crop = {
+    fx: Math.min(imgEdCropDrag.fx, cur.fx), fy: Math.min(imgEdCropDrag.fy, cur.fy),
+    fw: Math.abs(cur.fx - imgEdCropDrag.fx), fh: Math.abs(cur.fy - imgEdCropDrag.fy)
+  };
+  drawImgEditor();
+});
+$('imgEditorCanvas').addEventListener('pointerup', () => { imgEdCropDrag = null; });
+$('btnImgPlaceText').addEventListener('click', () => {
+  if (!imgEd) return;
+  const text = $('imgTextInput').value.trim();
+  if (!text) { setStatus('Type the text first, then click a spot on the image and tap “Place text”.', true); return; }
+  if (!imgEd.pendingText) { setStatus('Click a spot on the image first, then tap “Place text”.', true); return; }
+  imgEdPushHistory();
+  imgEd.texts.push({
+    fx: imgEd.pendingText.fx, fy: imgEd.pendingText.fy,
+    text, size: Number($('imgTextSize').value) || 32,
+    color: $('imgTextColor').value || '#000000'
+  });
+  imgEd.pendingText = null;
+  $('imgTextInput').value = '';
+  drawImgEditor();
+});
+async function imgEdDone() {
+  if (!imgEd) return;
+  const f = imgEd.file;
+  try {
+    /* Export the final image: base pixels + live filter/adjust + text,
+       baked onto one canvas at the working size. */
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = imgEd.w; exportCanvas.height = imgEd.h;
+    const ctx = exportCanvas.getContext('2d');
+    ctx.filter = imgEdFilterString();
+    ctx.drawImage(imgEd.base, 0, 0, imgEd.w, imgEd.h);
+    ctx.filter = 'none';
+    imgEd.texts.forEach((t) => {
+      ctx.font = 'bold ' + t.size + 'px Helvetica, Arial, sans-serif';
+      ctx.fillStyle = t.color;
+      ctx.fillText(t.text, t.fx * imgEd.w, t.fy * imgEd.h);
+    });
+    const mime = f.ext === 'png' ? 'image/png' : f.ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    const blob = await canvasToBlob(exportCanvas, mime, 0.92);
+    if (!blob) throw new Error('Could not save the edited image.');
+    const newFile = new File([blob], f.name, { type: mime, lastModified: Date.now() });
+    const dataUrl = await readAsDataURL(newFile);
+    /* Replace the file in place: same id, same name, same position in
+       the list — only the pixels, size and preview change. The Join
+       order and every other file are untouched. */
+    f.file = newFile; f.size = blob.size; f.dataUrl = dataUrl;
+    /* Drop any downloads made from the old version of this file, so
+       stale outputs never linger after an edit. */
+    pendingOutputs = pendingOutputs.filter((o) => !(o.sourceIds || []).includes(f.id));
+    renderOutputs();
+    $('imgEditorModal').hidden = true;
+    imgEd = null;
+    renderAll();
+    setStatus('Saved your edits to ' + f.name + ' — it is now ' + fmtSize(f.size) + '.');
+  } catch (err) {
+    setStatus('Could not save the edited image: ' + (err && err.message ? err.message : 'unknown error'), true);
+  }
+}
+function imgEdClose() { $('imgEditorModal').hidden = true; imgEd = null; }
+$('btnImgDone').addEventListener('click', imgEdDone);
+$('btnImgCancel').addEventListener('click', imgEdClose);
+$('btnCloseImgEditor').addEventListener('click', imgEdClose);
+$('btnImgUndo').addEventListener('click', imgEdUndo);
+$('btnImgReset').addEventListener('click', () => { imgEdReset(); });
+$('btnImgCrop').addEventListener('click', () => { if (imgEd) imgEdSetCropMode(!imgEd.cropMode); });
+$('btnImgCropApply').addEventListener('click', imgEdApplyCrop);
+$('btnImgCropCancel').addEventListener('click', () => imgEdSetCropMode(false));
+$('btnImgRotL').addEventListener('click', () => imgEdRotate(-1));
+$('btnImgRotR').addEventListener('click', () => imgEdRotate(1));
+$('btnImgFlipH').addEventListener('click', () => imgEdFlip(true));
+$('btnImgFlipV').addEventListener('click', () => imgEdFlip(false));
+document.querySelectorAll('.img-filter').forEach((b) => b.addEventListener('click', () => imgEdSetFilter(b.dataset.filter)));
+$('btnImgTextMode').addEventListener('click', () => { if (imgEd) imgEdSetTextMode(!imgEd.textMode); });
+$('btnImgResize').addEventListener('click', imgEdApplyResize);
+$('imgWidth').addEventListener('change', () => { if (imgEd && $('imgLockRatio').checked) $('imgHeight').value = Math.max(1, Math.round(Number($('imgWidth').value) * imgEd.h / imgEd.w)); });
+$('imgHeight').addEventListener('change', () => { if (imgEd && $('imgLockRatio').checked) $('imgWidth').value = Math.max(1, Math.round(Number($('imgHeight').value) * imgEd.w / imgEd.h)); });
+[['imgBright', 'bright'], ['imgContrast', 'contrast'], ['imgSat', 'sat']].forEach(([id, key]) => {
+  $(id).addEventListener('input', () => imgEdSetAdjust(key, Number($(id).value)));
+  $(id).addEventListener('change', imgEdEndAdjust);
 });
 
 /* ---------- Init ---------- */

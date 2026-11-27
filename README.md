@@ -22,6 +22,15 @@ Originally built as **Dockora**. Renamed to **FileNora** on 27 Nov 2026 — the 
 - **10-second countdown** — after any file is generated, a visible progress bar counts down 10 seconds and the Download button unlocks. There is no instant-download bypass.
 - **Ads** — three labelled placeholders only (top banner, between tasks and workspace, in the download panel). AdSense verification code placed in `<head>` on 27 Nov 2026 (pub-2188368806087422, `ads.txt` added); site under review. No ad units yet — those come after approval.
 
+## v2.3 editor (27 Nov 2026)
+
+The user asked for Photopea-style editing before converting: uploading a JPG and tapping Convert used to convert straight away, with no chance to crop or fix the file first. Every file row now has an **Edit** button (images and PDFs; DOCX / TXT have none — pixel and PDF editing does not apply to them). Convert itself stays direct — Edit is the step before it, and the Convert panel now says: "Want to crop or fix it first? Tap Edit on the file below."
+
+- **Edit image (JPG / PNG / WebP)** — a canvas editor in a modal: Crop (drag a box, Apply / Cancel), Rotate left / right in 90° steps, Flip horizontal / vertical, Resize by pixels with a "Keep proportions" lock, Adjust sliders for Brightness / Contrast / Saturation (live preview), Filters (None, Grayscale, Sepia, Invert), Text (click a spot, type, pick size and colour, Place text — same simple approach as the PDF editor). Undo steps back through edits (20 steps), Reset goes back to the original file.
+- **Edit PDF** — the Edit button opens the existing PDF editor (whiteout + add text); that logic was not rebuilt. The sample file is a PDF, so its Edit opens the PDF editor too.
+- **Done replaces the file in place** — same id, same name, same position in the list; only pixels, size and preview change. Downloads made from the old version are dropped, so stale outputs never linger. Cancel throws the edits away. Editing one file never disturbs the others or the Join order, and the edited file can still be used by any task (Convert, Make smaller, Join, Split, Rotate).
+- **Scope limits (deliberate):** no layers panel, no masks, no healing/clone brush, no selection/lasso tools, no plugins. Photopea has dozens of pro tools; this is the practical set for a file-tools site.
+
 ## v2.1 fixes (27 Nov 2026)
 
 From a live first-time-user test on filenora.in:

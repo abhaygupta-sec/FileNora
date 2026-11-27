@@ -144,6 +144,7 @@
         <select id="convertFormat"></select>
       </label>
       <p class="muted small">PDFs can become photos or plain text. Photos can become a PDF or another photo type.</p>
+      <p class="muted small">Want to crop or fix it first? Tap Edit on the file below.</p>
     </div>
 
     <div id="joinOrderPanel" class="panel" hidden>
@@ -225,6 +226,65 @@
       <div class="row">
         <button type="button" class="btn btn-primary" id="btnSaveEdit">Save edited PDF</button>
         <span class="muted small">Saving creates a new PDF with your changes applied.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image editor modal -->
+  <div id="imgEditorModal" class="modal" hidden role="dialog" aria-modal="true" aria-label="Edit image">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="imgEditorTitle">Edit image</h3>
+        <button type="button" class="btn btn-secondary" id="btnCloseImgEditor">Close</button>
+      </div>
+      <p class="muted">Crop, rotate, flip, resize, adjust the light and colours, add a filter or some text. Tap &ldquo;Done&rdquo; to keep your edits — &ldquo;Cancel&rdquo; throws them away.</p>
+      <div class="img-toolbar">
+        <div class="img-tool-row" role="group" aria-label="Crop">
+          <button type="button" id="btnImgCrop" class="btn btn-secondary btn-small">Crop</button>
+          <button type="button" id="btnImgCropApply" class="btn btn-primary btn-small" hidden>Apply crop</button>
+          <button type="button" id="btnImgCropCancel" class="btn btn-secondary btn-small" hidden>Cancel crop</button>
+          <span class="muted small" id="imgCropHint" hidden>Drag a box on the image, then tap &ldquo;Apply crop&rdquo;.</span>
+        </div>
+        <div class="img-tool-row" role="group" aria-label="Rotate and flip">
+          <button type="button" id="btnImgRotL" class="btn btn-secondary btn-small">&#10226; Rotate left</button>
+          <button type="button" id="btnImgRotR" class="btn btn-secondary btn-small">Rotate right &#10227;</button>
+          <button type="button" id="btnImgFlipH" class="btn btn-secondary btn-small">Flip &#8646;</button>
+          <button type="button" id="btnImgFlipV" class="btn btn-secondary btn-small">Flip &#8645;</button>
+        </div>
+        <div class="img-tool-row" role="group" aria-label="Resize">
+          <label class="img-resize-label">Width <input type="number" id="imgWidth" min="1" max="10000" inputmode="numeric"></label>
+          <label class="img-resize-label">Height <input type="number" id="imgHeight" min="1" max="10000" inputmode="numeric"></label>
+          <label class="img-lock"><input type="checkbox" id="imgLockRatio" checked> Keep proportions</label>
+          <button type="button" id="btnImgResize" class="btn btn-secondary btn-small">Apply size</button>
+        </div>
+        <div class="img-tool-row" role="group" aria-label="Adjust light and colour">
+          <label class="img-slider">Brightness <input type="range" id="imgBright" min="0.5" max="1.5" step="0.05" value="1"></label>
+          <label class="img-slider">Contrast <input type="range" id="imgContrast" min="0.5" max="1.5" step="0.05" value="1"></label>
+          <label class="img-slider">Saturation <input type="range" id="imgSat" min="0" max="2" step="0.05" value="1"></label>
+        </div>
+        <div class="img-tool-row" role="group" aria-label="Filters">
+          <button type="button" class="btn btn-secondary btn-small img-filter" data-filter="none">None</button>
+          <button type="button" class="btn btn-secondary btn-small img-filter" data-filter="grayscale">Grayscale</button>
+          <button type="button" class="btn btn-secondary btn-small img-filter" data-filter="sepia">Sepia</button>
+          <button type="button" class="btn btn-secondary btn-small img-filter" data-filter="invert">Invert</button>
+        </div>
+        <div class="img-tool-row" role="group" aria-label="Add text">
+          <button type="button" id="btnImgTextMode" class="btn btn-secondary btn-small">Add text</button>
+          <label class="img-text-label">Text <input type="text" id="imgTextInput" placeholder="Type your text"></label>
+          <label class="img-text-label">Size <input type="number" id="imgTextSize" value="32" min="8" max="200"></label>
+          <label class="img-text-label">Colour <input type="color" id="imgTextColor" value="#000000"></label>
+          <button type="button" id="btnImgPlaceText" class="btn btn-secondary btn-small">Place text</button>
+        </div>
+      </div>
+      <p id="imgEditorInfo" class="muted small"></p>
+      <div class="img-canvas-wrap">
+        <canvas id="imgEditorCanvas"></canvas>
+      </div>
+      <div class="row">
+        <button type="button" class="btn btn-secondary" id="btnImgUndo">Undo</button>
+        <button type="button" class="btn btn-secondary" id="btnImgReset">Reset</button>
+        <button type="button" class="btn btn-secondary" id="btnImgCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnImgDone">Done — use this image</button>
       </div>
     </div>
   </div>
