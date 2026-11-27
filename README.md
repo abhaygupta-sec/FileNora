@@ -8,18 +8,31 @@ Free PDF & file tools that run entirely in your browser. No sign-up, no upload, 
 
 Originally built as **Dockora**. Renamed to **FileNora** on 27 Nov 2026 — the Dockora name was already taken, and the domain **filenora.in** was bought the same day. Every reference (branding, output filenames, sitemap, robots.txt) now uses FileNora / filenora.in. Nothing else changed in this rename.
 
-## What it does (v1)
+## What it does (v2)
 
-- **Upload** — drag-and-drop or file picker. PDF, JPG, PNG, WebP, DOCX, TXT. Multiple files at once, up to 50 MB per file.
+- **Pick a task first** — 8 plain-language tasks in Step 1. Step 2 adds the files, Step 3 is one big button named for the task.
+- **Upload** — drag-and-drop or file picker. PDF, JPG, PNG, WebP, DOCX, TXT. Multiple files at once, up to 50 MB per file. A "Try with a sample file" button builds a small sample PDF for testing.
 - **Preview** — every PDF page (via PDF.js), images directly, TXT and DOCX as extracted text.
-- **Merge PDF** — when 2+ files are added you are asked "Separate or merge?". Merge lets you reorder files (drag, or Up / Down buttons) before merging into one PDF.
-- **Split PDF** — tick the pages to keep, or type a page range like "1-3, 5", extract them into a new PDF.
+- **Join files into one PDF** — pick the task, add 2 or more files, put them in order with Up / Down buttons, tap "Join into one PDF".
+- **Keep only some pages** — tick the pages to keep, or type a page range like "1-3, 5", then tap "Keep these pages".
 - **Compress to an exact size** — presets 50 KB, 100 KB, 150 KB, 200 KB, 250 KB, 300 KB, 500 KB, 1 MB, plus a custom KB value. Images are re-encoded at lower quality / size; PDFs are re-rendered at lower quality. The real final size is always shown, and if the target cannot be reached it says so plainly.
-- **Convert** — images to PDF, PDF pages to JPG/PNG, TXT to PDF, DOCX to PDF, PDF to TXT, and image to image (JPG/PNG/WebP).
+- **Convert** — pick "Change file type", choose what to change to, tap the button. Images to PDF, PDF pages to JPG/PNG, TXT to PDF, DOCX to PDF, PDF to TXT, and image to image (JPG/PNG/WebP).
 - **Edit PDF** — open a PDF page, drag a white rectangle over a word to cover it (whiteout), or click a spot and add new text with a size and colour you choose. Font matching is best-effort: the page's approximate text size is detected and pre-filled, but the original font is often embedded in the PDF and cannot be matched exactly — the editor says this in plain language.
-- **Rotate PDF** — 90°, 180° or 270° from the Run job, or 90° per click from a file card.
-- **10-second countdown** — after any file is generated, the Download button stays locked for 10 seconds with an ad slot shown beside it. There is no instant-download bypass.
-- **Ads** — three labelled placeholders only (top banner, between tools and workspace, in the download panel). Real AdSense code goes in after AdSense approves the site.
+- **Rotate PDF** — pick the angle (90°, 180° or 270°), tap "Turn the pages".
+- **10-second countdown** — after any file is generated, a visible progress bar counts down 10 seconds and the Download button unlocks. There is no instant-download bypass.
+- **Ads** — three labelled placeholders only (top banner, between tasks and workspace, in the download panel). Real AdSense code goes in after AdSense approves the site.
+
+## v2 UX rebuild (27 Nov 2026)
+
+The workspace was rebuilt task-first, because v1 made the user think too hard: three ways to pick a job, files asked for before the task, and technical wording throughout.
+
+- **One task picker, plain words.** Step 1 is 8 big task cards ("Make a file smaller", "Join files into one PDF", "Turn photos into a PDF", "Save PDF pages as photos", "Keep only some pages", "Remove a word from a PDF", "Change file type", "Turn pages the right way up"), each with a real-life "when" line and the technical term as small secondary text. The job dropdown and the per-file action buttons are gone.
+- **Three steps, one path.** Step 1 pick a task, Step 2 add files, Step 3 one big button named for the task ("Make it smaller", "Join into one PDF"). The button shows "Working…" with a spinner while a job runs. On phones it sticks to the bottom of the screen.
+- **No merge question.** Picking "Join files into one PDF" IS the merge — files are ordered with Up / Down buttons, no separate-or-merge prompt ever appears.
+- **Only the options that task needs.** Target size (default 100 KB) for "Make a file smaller", JPG/PNG picker for photos, angle picker for turning pages, a "Change to" picker for changing file type. "Keep only some pages" uses its own panel (checkboxes + page range + "Keep these pages" button) as its action.
+- **Plain results.** After a run, one clear line first ("Done — your file is 87 KB, under your 100 KB limit."), then a visible countdown progress bar, then Download. "Do another file" / "Start over" clears everything and returns to Step 1.
+- **Try with a sample file.** Step 2 has a button that builds a small 1-page sample PDF in the browser, so anyone can try a task without having a file ready.
+- **All v1.3 behaviour kept:** 10-second countdown with no bypass, duplicate-file skip, total file count, removing a file drops its outputs, re-running a job replaces (never duplicates) outputs, countdown note swaps to "Download is unlocked" at 0, same 3 ad placeholders, same navy/teal design.
 
 ## v1.3 fixes (27 Nov 2026)
 
