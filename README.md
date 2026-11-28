@@ -32,7 +32,7 @@ From a first-time-user audit of the live site, plus the SEO package and Google A
 - **One URL per tool.** `index.html` reads `?task=` on load and preselects that task; picking a task updates the URL with `history.replaceState`, so each tool has a shareable link.
 - **Task icons.** Each of the 8 task cards has a simple flat inline SVG icon (navy/teal, no emoji, no gradients).
 - **Favicon 404.** A `_redirects` file (Cloudflare Pages format) serves `/favicon.ico` from the existing `assets/filenora-icon.png`.
-- **Contact, once.** There is exactly one Contact section on the page, saying "Support email will be added soon." No email address is invented.
+- **Contact, once.** There is exactly one Contact section on the page. Since 28 Nov 2026 it shows the real address `support@filenora.in` (Cloudflare Email Routing forwards it, plus a catch-all, to `abhaygupta.sec@gmail.com`). No email address is invented — this one is real and live.
 - **Edit task hint.** Picking "Remove a word from a PDF" shows: "Add your PDF, tap Edit, then drag over the word to cover it — or add new text in its place." Its button is "Open the editor".
 - **Page size for photos to PDF.** The "Turn photos into a PDF" panel has a "Page size" selector: "Fit to photo" (default, each page the size of the photo) or "A4" (each photo centred on an A4 page).
 - **Sample file matches the task.** For "Turn photos into a PDF" the sample is now a JPEG photo, not a PDF. For other tasks it is still a PDF — but now a document-like one: white page, title line, paragraph bars and a small photo-like block, so thumbnails look like a real document instead of noise.
