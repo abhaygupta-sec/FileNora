@@ -37,24 +37,41 @@ function setStatus(msg, isError) {
   el.textContent = msg || '';
   el.classList.toggle('error', !!isError);
 }
-/* The status line under Step 2 follows what the user has done so far —
-   it never says "pick a task" after a task was picked. `extra` is an
-   optional note appended (e.g. a duplicate-skip note). */
+/* The status line under Step 2 follows what the user has done so far.
+   The "You picked: ..." line above it already names the task, so the
+   status never repeats it — it used to, and the phrase showed twice. */
 const INIT_STATUS = 'Ready. Pick what you want to do above, then add your files — no sign-in, and your files never leave your device.';
 function updateStatusLine(extra) {
   let msg;
-  if (!currentTask) msg = INIT_STATUS;
-  else if (!files.length) msg = 'You picked: ' + TASKS[currentTask].title + '. Now add your files below.';
+  if (!currentTask && !files.length) msg = INIT_STATUS;
+  else if (!currentTask) msg = files.length + (files.length === 1 ? ' file' : ' files') + ' added. Pick what you want to do above.';
+  else if (!files.length) msg = 'Now add your files below.';
   else msg = files.length + (files.length === 1 ? ' file' : ' files') + ' added. Tap “' + TASKS[currentTask].action + '” when you’re ready.';
   setStatus(msg + (extra || ''));
 }
-/* The hint beside the Step 3 button follows state too. */
+/* The hint beside the Step 3 button follows what the task actually
+   needs — it only says "Ready" when the job can really run. One file
+   is not enough to join, and a PDF is not a photo, so those states
+   still ask for the right file instead of saying "Ready". */
+function taskReady() {
+  if (!currentTask || !files.length) return false;
+  if (currentTask === 'join') return files.length >= 2;
+  if (currentTask === 'jpg2pdf') return files.some((f) => f.kind === 'image');
+  if (currentTask === 'pdf2jpg' || currentTask === 'rotate' || currentTask === 'edit') return files.some((f) => f.kind === 'pdf');
+  return true;
+}
 function updateActionHint() {
   const el = $('actionHint');
   if (!el) return;
-  el.textContent = !currentTask ? 'Pick a task above to continue.'
-    : !files.length ? 'Add your files above, then tap the button.'
-    : 'Ready — tap the button.';
+  if (!currentTask) { el.textContent = 'Pick a task above to continue.'; return; }
+  if (!files.length) { el.textContent = 'Add your files above, then tap the button.'; return; }
+  if (!taskReady()) {
+    if (currentTask === 'join') el.textContent = 'Add one more file — joining needs 2 or more.';
+    else if (currentTask === 'jpg2pdf') el.textContent = 'Add a photo first — JPG, PNG or WebP.';
+    else el.textContent = 'Add a PDF first.';
+    return;
+  }
+  el.textContent = 'Ready — tap the button.';
 }
 function fmtSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
@@ -119,7 +136,7 @@ const TASKS = {
   jpg2pdf: { title: 'Turn photos into a PDF', action: 'Turn photos into a PDF', hint: 'Add photos from your phone or computer.' },
   pdf2jpg: { title: 'Save PDF pages as photos', action: 'Save as photos', hint: 'Add a PDF — each page becomes a photo.' },
   split: { title: 'Keep only some pages', action: 'Keep these pages', hint: 'Add a PDF, then tick the pages you want to keep.' },
-  edit: { title: 'Remove a word from a PDF', action: 'Open the editor', hint: 'Add a PDF, then tap “Open the editor”.' },
+  edit: { title: 'Remove a word from a PDF', action: 'Open the editor', hint: 'Add your PDF, tap Edit, then drag over the word to cover it — or add new text in its place.' },
   convert: { title: 'Change file type', action: 'Change file type', hint: 'Add a file, choose what to change it to, then tap “Change file type”.' },
   rotate: { title: 'Turn pages the right way up', action: 'Turn the pages', hint: 'Add a PDF, then tap “Turn the pages”.' }
 };
@@ -135,7 +152,19 @@ function selectTask(task) {
   currentTask = task;
   updateTaskUI();
   $('taskHint').textContent = TASKS[task] ? TASKS[task].hint : '';
+  syncTaskUrl();
   document.getElementById('workspace').scrollIntoView({ behavior: 'smooth' });
+}
+/* One URL per tool: picking a task writes ?task=<id> into the address
+   bar (replaceState, so the Back button is not filled with task
+   picks), and loading with ?task=<id> preselects that task. */
+function syncTaskUrl() {
+  try {
+    const url = currentTask
+      ? window.location.pathname + '?task=' + currentTask
+      : window.location.pathname;
+    window.history.replaceState(null, '', url);
+  } catch (e) { /* file:// or old browsers: the URL just stays as it is */ }
 }
 /* Show only the options the selected task needs, and set the one
    action button's label. Split has no generic action button — its own
@@ -150,10 +179,21 @@ function updateTaskUI() {
     if (t) $('pickedTaskName').textContent = TASKS[t].title;
   }
   $('targetSizePanel').hidden = t !== 'compress';
+  $('jpg2pdfPanel').hidden = t !== 'jpg2pdf';
   $('pdf2jpgPanel').hidden = t !== 'pdf2jpg';
   $('rotatePanel').hidden = t !== 'rotate';
   $('convertPanel').hidden = t !== 'convert';
-  $('joinOrderPanel').hidden = !(t === 'join' && files.length >= 2);
+  /* The Join panel (order + pages-per-sheet) shows as soon as the
+     Join task is picked, even with 0 or 1 files — the order list
+     itself waits until there are 2 files to order (see
+     renderJoinOrder). */
+  $('joinOrderPanel').hidden = t !== 'join';
+  const sampleNote = $('sampleNote');
+  if (sampleNote) {
+    sampleNote.textContent = t === 'jpg2pdf'
+      ? 'No photo handy? We make a sample photo for you to try with.'
+      : 'No file handy? We make a sample PDF for you to try with — big enough to shrink, so you can see it work.';
+  }
   const bar = $('actionBar');
   if (t === 'split') {
     bar.hidden = true;
@@ -171,13 +211,26 @@ function updateTaskUI() {
 }
 /* The "Change file type" task needs one choice: what to change to.
    Options follow the first file's kind, so only supported targets
-   are offered (PDFs: photo or text; photos: PDF or photo type). */
+   are offered (PDFs: photo or text; photos: PDF or photo type), and
+   the default is never the file's own type: a PDF defaults to JPG,
+   a photo to PDF, and TXT / DOCX to PDF. The "Tap Edit" hint only
+   shows for photos; for PDFs it is reworded to cover / add text. */
 function renderConvertOptions() {
   const sel = $('convertFormat');
   if (!sel) return;
   const first = files[0];
   sel.innerHTML = first ? convertOptionsFor(first)
     : '<option value="pdf">PDF</option><option value="jpg">JPG</option><option value="png">PNG</option><option value="webp">WebP</option><option value="txt">TXT</option>';
+  if (first) {
+    sel.value = first.kind === 'pdf' ? 'jpg' : 'pdf';
+  }
+  const hint = $('convertEditHint');
+  if (hint) {
+    if (!first) hint.hidden = true;
+    else if (first.kind === 'image') { hint.hidden = false; hint.textContent = 'Want to crop or fix it first? Tap Edit on the file below.'; }
+    else if (first.kind === 'pdf') { hint.hidden = false; hint.textContent = 'Want to cover or add text first? Tap Edit on the file below.'; }
+    else hint.hidden = true;
+  }
 }
 /* While a job runs, the action button says "Working…" with a spinner,
    so the user is never left wondering if the page is stuck. */
@@ -217,28 +270,50 @@ dropzone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
 
 /* ---------- Sample file ---------- */
-/* "Try with a sample file": builds a genuinely oversized sample PDF in
-   the browser — a photo-like JPEG (gradient + noise, ~300–500 KB)
-   embedded on 2 pages — so "Make a file smaller" can actually show
-   shrinking. Every click makes a DISTINCT file (numbered name, new
-   caption text, fresh timestamp) so the duplicate skip never blocks a
-   second click, and two samples can demo the Join task. */
+/* "Try with a sample file": for "Turn photos into a PDF" it builds a
+   sample PHOTO (JPEG), not a PDF — the task needs a photo. For every
+   other task it builds a sample PDF that looks like a real document:
+   a white page, a title line, paragraph bars and a small photo-like
+   block, big enough to shrink. Every click makes a DISTINCT file
+   (numbered name, new caption text, fresh timestamp) so the duplicate
+   skip never blocks a second click, and two samples can demo Join. */
 $('btnSample').addEventListener('click', async () => {
-  if (!PDFLib) { setStatus('The PDF library did not load. Check your connection and reload.', true); return; }
   try {
     sampleCount++;
     const n = sampleCount;
+    if (currentTask === 'jpg2pdf') {
+      const photoBlob = await makeSamplePhotoImage(n);
+      const photo = new File([photoBlob], 'filenora-sample-photo-' + n + '.jpg', { type: 'image/jpeg', lastModified: Date.now() + n });
+      await handleFiles([photo]);
+      return;
+    }
+    if (!PDFLib) { setStatus('The PDF library did not load. Check your connection and reload.', true); return; }
     const photoBlob = await makeSamplePhoto(n);
     const photoBytes = await photoBlob.arrayBuffer();
     const doc = await PDFLib.PDFDocument.create();
     const img = await doc.embedJpg(photoBytes);
     const helv = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+    const helvBold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
     for (let p = 1; p <= 2; p++) {
-      const page = doc.addPage([img.width, img.height]);
-      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-      page.drawRectangle({ x: 0, y: img.height - 110, width: img.width, height: 110, color: PDFLib.rgb(1, 1, 1), opacity: 0.92 });
-      page.drawText('FileNora sample file #' + n + ' — page ' + p + ' of 2', { x: 60, y: img.height - 55, size: 30, font: helv, color: PDFLib.rgb(0.06, 0.16, 0.26) });
-      page.drawText('Try "Make a file smaller" with this file — it is big enough to shrink.', { x: 60, y: img.height - 92, size: 20, font: helv, color: PDFLib.rgb(0.06, 0.16, 0.26) });
+      /* A document page: white, title at the top, paragraph bars
+         below, and one photo-like block — so thumbnails look like a
+         real document, not noise. */
+      const page = doc.addPage([595, 842]);
+      page.drawText('FileNora sample file #' + n + ' — page ' + p + ' of 2', { x: 48, y: 790, size: 20, font: helvBold, color: PDFLib.rgb(0.06, 0.16, 0.26) });
+      page.drawText('Try "Make a file smaller" with this file — it is big enough to shrink.', { x: 48, y: 762, size: 12, font: helv, color: PDFLib.rgb(0.06, 0.16, 0.26) });
+      let y = 720;
+      for (let line = 0; line < 6; line++) {
+        page.drawRectangle({ x: 48, y, width: 420 - (line % 3) * 70, height: 9, color: PDFLib.rgb(0.86, 0.89, 0.92) });
+        y -= 20;
+      }
+      const imgW = 499, imgH = 310;
+      page.drawImage(img, { x: 48, y: y - imgH - 12, width: imgW, height: imgH });
+      page.drawText('A photo inside the document.', { x: 48, y: y - imgH - 32, size: 11, font: helv, color: PDFLib.rgb(0.36, 0.42, 0.48) });
+      y = y - imgH - 60;
+      for (let line = 0; line < 4; line++) {
+        page.drawRectangle({ x: 48, y, width: 430 - (line % 2) * 90, height: 9, color: PDFLib.rgb(0.86, 0.89, 0.92) });
+        y -= 20;
+      }
     }
     const bytes = await doc.save();
     const sample = new File([bytes], 'filenora-sample-' + n + '.pdf', { type: 'application/pdf', lastModified: Date.now() + n });
@@ -247,30 +322,63 @@ $('btnSample').addEventListener('click', async () => {
     setStatus('Could not make the sample file: ' + (err && err.message ? err.message : 'unknown error'), true);
   }
 });
-/* A photo-like image: a colour gradient covered in thousands of small
-   random shapes, so the JPEG has real entropy (and real size) instead
-   of compressing down to a few KB like flat text would. */
+/* A photo-like block for the sample document: a soft gradient with a
+   few large shapes and light texture — enough entropy for a real
+   JPEG size, but contained in one block on the page, not full-page
+   noise. */
 function makeSamplePhoto(n) {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
-    canvas.width = 1200; canvas.height = 1500;
+    canvas.width = 900; canvas.height = 560;
     const ctx = canvas.getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 1200, 1500);
+    const grad = ctx.createLinearGradient(0, 0, 900, 560);
     grad.addColorStop(0, '#1c5d8f');
     grad.addColorStop(0.5, '#3a8f7a');
     grad.addColorStop(1, '#e8b64c');
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 1200, 1500);
-    for (let i = 0; i < 15000; i++) {
+    ctx.fillRect(0, 0, 900, 560);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(720, 110, 70, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(15,42,67,0.55)';
+    ctx.beginPath(); ctx.arc(220, 430, 130, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath(); ctx.arc(430, 470, 90, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 6000; i++) {
       ctx.fillStyle = 'rgba(' + (Math.random() * 255 | 0) + ',' + (Math.random() * 255 | 0) + ',' + (Math.random() * 255 | 0) + ',' + (Math.random() * 0.25).toFixed(2) + ')';
-      ctx.fillRect(Math.random() * 1200, Math.random() * 1500, 2 + Math.random() * 14, 2 + Math.random() * 14);
+      ctx.fillRect(Math.random() * 900, Math.random() * 560, 2 + Math.random() * 10, 2 + Math.random() * 10);
     }
     ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 48px Arial';
+    ctx.fillText('FileNora sample #' + n, 48, 120);
+    ctx.font = '28px Arial';
+    ctx.fillText('A photo inside the document.', 48, 170);
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not make the sample photo.'))), 'image/jpeg', 0.92);
+  });
+}
+/* A standalone sample photo for "Turn photos into a PDF": a simple
+   bright scene (sky, sun, hills) with a caption — a real JPEG file,
+   not a PDF. */
+function makeSamplePhotoImage(n) {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200; canvas.height = 900;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 900);
+    grad.addColorStop(0, '#7ec3e8');
+    grad.addColorStop(0.6, '#cfeeda');
+    grad.addColorStop(1, '#8fbf7f');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1200, 900);
+    ctx.fillStyle = '#f7d774';
+    ctx.beginPath(); ctx.arc(980, 170, 90, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5d8f5a';
+    ctx.beginPath(); ctx.arc(300, 980, 420, Math.PI, 0); ctx.fill();
+    ctx.beginPath(); ctx.arc(900, 1020, 480, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 64px Arial';
-    ctx.fillText('FileNora sample #' + n, 80, 200);
+    ctx.fillText('FileNora sample photo #' + n, 80, 200);
     ctx.font = '36px Arial';
-    ctx.fillText('Try "Make a file smaller" with this file.', 80, 280);
-    ctx.fillText('It is already big enough to shrink.', 80, 340);
+    ctx.fillText('Try "Turn photos into a PDF" with this photo.', 80, 280);
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not make the sample photo.'))), 'image/jpeg', 0.9);
   });
 }
@@ -432,6 +540,15 @@ async function renderPreviews() {
 function renderJoinOrder() {
   const list = $('joinOrderList');
   if (!list) return;
+  /* With fewer than 2 files there is nothing to order yet — show the
+     "add 2 or more" note instead of an empty list. The panel itself
+     (and its pages-per-sheet selector) is already visible. */
+  const showOrder = files.length >= 2;
+  const intro = $('joinOrderIntro');
+  const needMore = $('joinNeedMore');
+  if (intro) intro.hidden = !showOrder;
+  if (needMore) needMore.hidden = showOrder;
+  list.hidden = !showOrder;
   list.innerHTML = '';
   joinOrder.forEach((id, idx) => {
     const f = files.find((x) => x.id === id);
@@ -582,6 +699,7 @@ function startOver() {
   clearOutputs();
   renderAll();
   $('taskHint').textContent = 'Pick a task above first, then add your files here.';
+  syncTaskUrl();
   document.getElementById('tasks').scrollIntoView({ behavior: 'smooth' });
 }
 $('btnStartOver').addEventListener('click', startOver);
@@ -719,13 +837,25 @@ async function doMergeNup(ordered, perSheet) {
 }
 
 /* ---------- Images to PDF ---------- */
+/* "Fit to photo" makes each page the size of its photo (the old
+   behaviour). "A4" puts each photo centred on an A4 page, keeping
+   its proportions, with a margin around it. */
 async function imagesToPdf(images) {
   if (!images.length) { setStatus('Add a JPG, PNG or WebP photo first.', true); return; }
+  const pageSize = ($('jpg2pdfPageSize') && $('jpg2pdfPageSize').value) || 'fit';
   const out = await PDFLib.PDFDocument.create();
   for (const f of images) {
     const img = await embedImage(out, f);
-    const page = out.addPage([img.width, img.height]);
-    page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+    if (pageSize === 'a4') {
+      const page = out.addPage([595, 842]);
+      const margin = 48;
+      const scale = Math.min((595 - margin * 2) / img.width, (842 - margin * 2) / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      page.drawImage(img, { x: (595 - w) / 2, y: (842 - h) / 2, width: w, height: h });
+    } else {
+      const page = out.addPage([img.width, img.height]);
+      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+    }
   }
   const bytes = await out.save();
   prepareDownload(new Blob([bytes], { type: 'application/pdf' }), 'filenora-images.pdf',
@@ -1356,8 +1486,13 @@ function openTextEditor(f) {
   $('textEditorArea').value = f.text || '';
   $('textEditorError').hidden = true;
   $('textEditorError').textContent = '';
+  /* The Word warning is its own prominent line at the top of the
+     modal, not buried in the note: only the text is kept, and a
+     rebuilt Word file can grow. It shows for DOCX only. */
+  const warn = $('textEditorWarning');
+  if (warn) warn.hidden = f.kind !== 'docx';
   $('textEditorNote').textContent = f.kind === 'docx'
-    ? 'This is the text from your Word file. Only the text is kept — bold, tables, pictures and other formatting are not saved. When you tap Done, a new Word file is made from this text, with one paragraph per blank-line gap.'
+    ? 'Edit the text below, then tap Done to keep your changes. A new Word file is made from this text, with one paragraph per blank-line gap.'
     : 'Edit the text below, then tap Done to keep your changes.';
   $('textEditorModal').hidden = false;
   $('textEditorArea').focus();
@@ -1742,3 +1877,10 @@ $('imgHeight').addEventListener('change', () => { if (imgEd && $('imgLockRatio')
 /* ---------- Init ---------- */
 setTargetKb(100);
 updateTaskUI(); /* no task picked yet: action button waits for Step 1; status line set by updateTaskUI */
+/* Deep link: ?task=<id> preselects that task on load (see syncTaskUrl).
+   An unknown value is ignored — the page just loads with no task. */
+(function preselectTaskFromUrl() {
+  let task = null;
+  try { task = new URLSearchParams(window.location.search).get('task'); } catch (e) { task = null; }
+  if (task && TASKS[task]) selectTask(task);
+})();

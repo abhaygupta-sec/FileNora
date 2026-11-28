@@ -22,6 +22,28 @@ Originally built as **Dockora**. Renamed to **FileNora** on 27 Nov 2026 — the 
 - **10-second countdown** — after any file is generated, a visible progress bar counts down 10 seconds and the Download button unlocks. There is no instant-download bypass.
 - **Ads** — three labelled placeholders only (top banner, between tasks and workspace, in the download panel). AdSense verification code placed in `<head>` on 27 Nov 2026 (pub-2188368806087422, `ads.txt` added); site under review. No ad units yet — those come after approval.
 
+## v2.5 SEO + audit fixes (28 Nov 2026)
+
+From a first-time-user audit of the live site, plus the SEO package and Google Analytics.
+
+- **Google Analytics.** The standard gtag.js snippet (Measurement ID `G-W2LQXRZH0Y`) is in `<head>` of `index.html` and of every per-tool page. The Privacy Policy's "What we collect" section now says plainly: "Google Analytics collects anonymous usage statistics (pages visited, tool used) — no files, no personal data." Reporting timezone / currency are India (GMT+05:30) and INR.
+- **Search Console verification.** The `<meta name="google-site-verification">` tag is in `<head>` of `index.html` and of every per-tool page. Verification itself happens after the push.
+- **SEO package.** `index.html` has a meta description, Open Graph + Twitter card tags, canonical `https://filenora.in/`, and JSON-LD (`WebApplication` + `FAQPage` matching the seven visible FAQs). Six new per-tool pages — `compress-pdf-to-100kb.html`, `merge-pdf.html`, `jpg-to-pdf.html`, `pdf-to-jpg.html`, `split-pdf.html`, `edit-pdf.html` — each with a real H1, plain explanation, steps, FAQs and a button linking to `index.html?task=<id>`. All six are in `sitemap.xml` (lastmod 2026-11-28).
+- **One URL per tool.** `index.html` reads `?task=` on load and preselects that task; picking a task updates the URL with `history.replaceState`, so each tool has a shareable link.
+- **Task icons.** Each of the 8 task cards has a simple flat inline SVG icon (navy/teal, no emoji, no gradients).
+- **Favicon 404.** A `_redirects` file (Cloudflare Pages format) serves `/favicon.ico` from the existing `assets/filenora-icon.png`.
+- **Contact, once.** There is exactly one Contact section on the page, saying "Support email will be added soon." No email address is invented.
+- **Edit task hint.** Picking "Remove a word from a PDF" shows: "Add your PDF, tap Edit, then drag over the word to cover it — or add new text in its place." Its button is "Open the editor".
+- **Page size for photos to PDF.** The "Turn photos into a PDF" panel has a "Page size" selector: "Fit to photo" (default, each page the size of the photo) or "A4" (each photo centred on an A4 page).
+- **Sample file matches the task.** For "Turn photos into a PDF" the sample is now a JPEG photo, not a PDF. For other tasks it is still a PDF — but now a document-like one: white page, title line, paragraph bars and a small photo-like block, so thumbnails look like a real document instead of noise.
+- **Convert defaults follow the file.** A PDF defaults to JPG, a photo to PDF, TXT / DOCX to PDF — never the file's own type. The "Tap Edit" hint only shows for photos; for PDFs it reads "Want to cover or add text first? Tap Edit on the file below."
+- **DOCX warning, prominent.** The text editor now shows its own warning line at the top for Word files: "Only the text is kept — bold, tables and pictures are not saved." plus "Word files are rebuilt from text, so a very small file may grow in size — the words stay the same."
+- **Join panel always visible.** "Pages on each sheet" shows as soon as the Join task is picked, with "Applies when you join 2 or more files." The order list waits until 2 files are added. The PDF editor's selector has the helper "Save with 1, 2 or 4 pages on each sheet."
+- **No more double lines.** The status line no longer repeats "You picked: ..." — that line already names the task, so the status just says "Now add your files below." "Start over — clear everything" appears once.
+- **Button hint follows real readiness.** "Ready — tap the button." only shows when the job can actually run — joining needs 2 or more files, photos-to-PDF needs a photo, PDF jobs need a PDF. Otherwise the hint asks for the right file.
+- **Format lists match.** The "Change file type" card and the drop zone both list PDF, JPG, PNG, WebP, DOCX, TXT.
+- **Kept as-is:** the 10-second download countdown and wait notice, the 3 labelled "Advertisement" boxes, all v2.4 features, the image editor, and the AdSense script in `<head>`.
+
 ## v2.4 edit for all files (27 Nov 2026)
 
 The user asked for Edit on every file type, page navigation inside the PDF editor, and putting several pages on one sheet.
